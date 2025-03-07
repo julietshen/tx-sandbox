@@ -11,6 +11,7 @@ from enum import Enum
 import hashlib
 import imagehash
 from skimage.color import rgb2gray
+import warnings
 
 # Increase the limit for integer string conversion
 sys.set_int_max_str_digits(1000000)
@@ -23,10 +24,35 @@ import io
 
 from database import Database
 
+# Suppress PDQ hash warning about vector order
+warnings.filterwarnings("ignore", message="Hash vector order changed between version")
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 class HashingAlgorithm(str, Enum):
     PDQ = "pdq"  # Perceptual hash for similar image detection
     MD5 = "md5"  # Cryptographic hash for exact matching
     SHA1 = "sha1"  # Cryptographic hash for exact matching
+    PHOTODNA = "photodna"  # Microsoft PhotoDNA (requires license)
+    NETCLEAN = "netclean"  # NetClean (requires license)
+
+# License configuration
+PHOTODNA_LICENSE_KEY = os.getenv("PHOTODNA_LICENSE_KEY")
+NETCLEAN_LICENSE_KEY = os.getenv("NETCLEAN_LICENSE_KEY")
+
+def check_algorithm_availability(algorithm: HashingAlgorithm) -> tuple[bool, str]:
+    """Check if an algorithm is available based on license status."""
+    if algorithm == HashingAlgorithm.PHOTODNA:
+        if not PHOTODNA_LICENSE_KEY:
+            return False, "PhotoDNA requires a license. Please contact Microsoft at https://www.microsoft.com/en-us/photodna"
+        return True, ""
+    elif algorithm == HashingAlgorithm.NETCLEAN:
+        if not NETCLEAN_LICENSE_KEY:
+            return False, "NetClean requires a license. Please contact NetClean at https://www.netclean.com/"
+        return True, ""
+    return True, ""
 
 app = FastAPI()
 db = Database()
@@ -34,19 +60,21 @@ db = Database()
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:3002"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 def compute_hash(image: np.ndarray, algorithm: HashingAlgorithm) -> tuple[str, float]:
     """Compute hash using specified algorithm."""
     try:
+        # Check algorithm availability
+        available, message = check_algorithm_availability(algorithm)
+        if not available:
+            logger.warning(f"Algorithm {algorithm} not available: {message}")
+            return "algorithm_not_licensed", 0.0
+
         if algorithm == HashingAlgorithm.PDQ:
             # Ensure image is RGB and contiguous
             if image.shape[-1] == 4:
@@ -56,6 +84,12 @@ def compute_hash(image: np.ndarray, algorithm: HashingAlgorithm) -> tuple[str, f
             hash_val, quality = pdqhash.compute(image)
             hash_hex = ''.join([f'{x:02x}' for x in hash_val.tobytes()])
             return hash_hex, float(quality)
+        elif algorithm == HashingAlgorithm.PHOTODNA:
+            # PhotoDNA implementation would go here if licensed
+            return "photodna_not_implemented", 0.0
+        elif algorithm == HashingAlgorithm.NETCLEAN:
+            # NetClean implementation would go here if licensed
+            return "netclean_not_implemented", 0.0
         
         # For cryptographic hashes, use PIL image bytes
         pil_image = Image.fromarray(image)
@@ -74,17 +108,25 @@ def compute_hash(image: np.ndarray, algorithm: HashingAlgorithm) -> tuple[str, f
 def calculate_hash_distance(hash1: str, hash2: str, algorithm: HashingAlgorithm) -> float:
     """Calculate distance between two hashes."""
     try:
+        # Check for unlicensed algorithms
+        if hash1 in ["algorithm_not_licensed", "photodna_not_implemented", "netclean_not_implemented"] or \
+           hash2 in ["algorithm_not_licensed", "photodna_not_implemented", "netclean_not_implemented"]:
+            return 100.0  # Return max distance for unlicensed/unimplemented algorithms
+
         if algorithm == HashingAlgorithm.PDQ:
             # PDQ uses Hamming distance
             hash1_int = int(hash1, 16)
             hash2_int = int(hash2, 16)
             return float(bin(hash1_int ^ hash2_int).count('1'))
+        elif algorithm in [HashingAlgorithm.PHOTODNA, HashingAlgorithm.NETCLEAN]:
+            # Licensed algorithm distance calculations would go here
+            return 100.0
         else:
             # For cryptographic hashes, only exact matches matter
             return 0.0 if hash1 == hash2 else 100.0
     except Exception as e:
         logger.error(f"Error calculating distance for {algorithm}: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return 100.0  # Return max distance on error
 
 def image_to_array(image_file: UploadFile) -> np.ndarray:
     """Convert uploaded image to numpy array."""
@@ -148,17 +190,25 @@ async def compare_images(image1: UploadFile = File(...), image2: UploadFile = Fi
                 interpretation = get_similarity_interpretation(distance, algorithm)
                 
                 results[algorithm] = {
-                    "distance": distance,
-                    "quality1": quality1,
-                    "quality2": quality2,
-                    "interpretation": interpretation
+                    "distance": float(distance),  # Ensure distance is a float
+                    "quality1": float(quality1),  # Ensure quality is a float
+                    "quality2": float(quality2),  # Ensure quality is a float
+                    "interpretation": interpretation,
+                    "hash1": hash1,
+                    "hash2": hash2
                 }
                 
                 logger.info(f"Computed {algorithm} hash with distance: {distance}")
                 
             except Exception as e:
                 logger.error(f"Error processing {algorithm}: {str(e)}")
-                results[algorithm] = {"error": str(e)}
+                results[algorithm] = {
+                    "error": str(e),
+                    "distance": 100.0,  # Default to maximum distance on error
+                    "quality1": 0.0,
+                    "quality2": 0.0,
+                    "interpretation": "Error calculating similarity"
+                }
         
         return {"results": results, "success": True}
         
@@ -177,6 +227,11 @@ def get_similarity_interpretation(distance: float, algorithm: HashingAlgorithm) 
         elif distance <= 80:
             return "Moderately similar images"
         return "Different images"
+    elif algorithm in [HashingAlgorithm.PHOTODNA, HashingAlgorithm.NETCLEAN]:
+        available, message = check_algorithm_availability(algorithm)
+        if not available:
+            return message
+        return "Algorithm not implemented - requires valid license"
     else:
         return "Exact match" if distance == 0 else "Different images"
 
