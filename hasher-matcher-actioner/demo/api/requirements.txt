@@ -1,6 +1,10 @@
-fastapi==0.104.0
-uvicorn==0.24.0
-python-multipart==0.0.6
-pillow==10.1.0
-numpy==1.26.0
+fastapi==0.109.2
+uvicorn==0.27.1
+python-multipart==0.0.9
+numpy==1.26.4
+Pillow==10.2.0
+pdqhash==0.2.3
+imagehash==4.3.1
+scikit-image==0.22.0
+python-magic==0.4.27
 # HMA dependencies will be installed from the parent directory 

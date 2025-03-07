@@ -1,0 +1,21 @@
+# Next.js build output
+.next
+out
+
+# Node.js dependencies
+node_modules
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+*.pem
