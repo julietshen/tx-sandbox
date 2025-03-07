@@ -13,8 +13,8 @@ import imagehash
 from skimage.color import rgb2gray
 import warnings
 
-# Increase the limit for integer string conversion
-sys.set_int_max_str_digits(1000000)
+# Import and configure warnings
+warnings.filterwarnings("ignore", message="Hash vector order changed between version")
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,9 +23,6 @@ from PIL import Image
 import io
 
 from database import Database
-
-# Suppress PDQ hash warning about vector order
-warnings.filterwarnings("ignore", message="Hash vector order changed between version")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -114,10 +111,14 @@ def calculate_hash_distance(hash1: str, hash2: str, algorithm: HashingAlgorithm)
             return 100.0  # Return max distance for unlicensed/unimplemented algorithms
 
         if algorithm == HashingAlgorithm.PDQ:
-            # PDQ uses Hamming distance
-            hash1_int = int(hash1, 16)
-            hash2_int = int(hash2, 16)
-            return float(bin(hash1_int ^ hash2_int).count('1'))
+            # PDQ uses Hamming distance - handle large integers by processing hex strings directly
+            def hex_to_bin(hex_str):
+                return ''.join(format(int(c, 16), '04b') for c in hex_str)
+            
+            bin1 = hex_to_bin(hash1)
+            bin2 = hex_to_bin(hash2)
+            # Count differing bits
+            return float(sum(b1 != b2 for b1, b2 in zip(bin1, bin2)))
         elif algorithm in [HashingAlgorithm.PHOTODNA, HashingAlgorithm.NETCLEAN]:
             # Licensed algorithm distance calculations would go here
             return 100.0
