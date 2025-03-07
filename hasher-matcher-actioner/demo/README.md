@@ -10,7 +10,6 @@ This demo showcases the capabilities of the Hasher-Matcher-Actioner (HMA) librar
   - Cropping
   - Rotation
   - Filters
-  - Text and emoji support
 - Real-time comparison updates after edits
 
 ## Prerequisites
