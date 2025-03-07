@@ -4,17 +4,12 @@ import { useState } from 'react';
 
 interface ImageComparisonProps {
   onImagesSelected?: (image1: File, image2: File) => void;
-  matchId?: string;
-  photoDNAKey?: string;
-  netCleanKey?: string;
 }
 
 enum HashingAlgorithm {
-  PHOTODNA = "photodna",
   PDQ = "pdq",
   MD5 = "md5",
-  SHA1 = "sha1",
-  NETCLEAN = "netclean"
+  SHA1 = "sha1"
 }
 
 interface AlgorithmResult {
@@ -30,12 +25,7 @@ interface ComparisonResults {
   success: boolean;
 }
 
-export default function ImageComparison({ 
-  onImagesSelected, 
-  matchId,
-  photoDNAKey,
-  netCleanKey 
-}: ImageComparisonProps) {
+export default function ImageComparison({ onImagesSelected }: ImageComparisonProps) {
   const [selectedImage1, setSelectedImage1] = useState<File | null>(null);
   const [selectedImage2, setSelectedImage2] = useState<File | null>(null);
   const [comparisonResults, setComparisonResults] = useState<ComparisonResults | null>(null);
@@ -44,22 +34,22 @@ export default function ImageComparison({
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>, imageNumber: number) => {
     if (e.target.files && e.target.files[0]) {
+      const newImage = e.target.files[0];
+      
       if (imageNumber === 1) {
-        setSelectedImage1(e.target.files[0]);
+        setSelectedImage1(newImage);
+        if (selectedImage2) {
+          await calculateDistances(newImage, selectedImage2);
+        }
       } else {
-        setSelectedImage2(e.target.files[0]);
+        setSelectedImage2(newImage);
+        if (selectedImage1) {
+          await calculateDistances(selectedImage1, newImage);
+        }
       }
 
-      // If both images are selected, calculate distances
-      if (
-        (imageNumber === 1 && selectedImage2) ||
-        (imageNumber === 2 && selectedImage1)
-      ) {
-        const img1 = imageNumber === 1 ? e.target.files[0] : selectedImage1;
-        const img2 = imageNumber === 2 ? e.target.files[0] : selectedImage2;
-        if (img1 && img2) {
-          await calculateDistances(img1, img2);
-        }
+      if (onImagesSelected && selectedImage1 && selectedImage2) {
+        onImagesSelected(selectedImage1, selectedImage2);
       }
     }
   };
@@ -80,8 +70,8 @@ export default function ImageComparison({
 
       const data = await response.json();
 
-      if (data.error) {
-        setError(data.error);
+      if (!data.success) {
+        setError(data.error || 'Failed to compare images');
       } else {
         setComparisonResults(data);
       }
@@ -95,35 +85,23 @@ export default function ImageComparison({
 
   const getAlgorithmDescription = (algorithm: HashingAlgorithm) => {
     switch (algorithm) {
-      case HashingAlgorithm.PHOTODNA:
-        return {
-          name: "PhotoDNA",
-          description: "Microsoft's robust perceptual hash, required for NCMEC submissions (requires licensing).",
-          distanceRange: "0 (match) or Different"
-        };
       case HashingAlgorithm.PDQ:
         return {
           name: "PDQ (Perceptual Difference Quantization)",
-          description: "Facebook's open-source perceptual hash, recommended for NCMEC submissions.",
+          description: "Facebook's open-source perceptual hash for finding similar images",
           distanceRange: "0-256 (lower is more similar)"
         };
       case HashingAlgorithm.MD5:
         return {
           name: "MD5",
-          description: "Cryptographic hash for exact matching, optional for NCMEC submissions.",
-          distanceRange: "0 (match) or Different"
+          description: "Cryptographic hash for exact image matching",
+          distanceRange: "0 (match) or 100 (different)"
         };
       case HashingAlgorithm.SHA1:
         return {
           name: "SHA1",
-          description: "Cryptographic hash for exact matching, optional for NCMEC submissions.",
-          distanceRange: "0 (match) or Different"
-        };
-      case HashingAlgorithm.NETCLEAN:
-        return {
-          name: "NetClean",
-          description: "Proprietary hash format, optional for NCMEC submissions (requires licensing).",
-          distanceRange: "0 (match) or Different"
+          description: "Cryptographic hash for exact image matching",
+          distanceRange: "0 (match) or 100 (different)"
         };
     }
   };
@@ -131,52 +109,19 @@ export default function ImageComparison({
   const renderAlgorithmCard = (algo: string, result: AlgorithmResult) => {
     const algorithm = algo as HashingAlgorithm;
     const description = getAlgorithmDescription(algorithm);
-    const isLicensedAlgorithm = algorithm === HashingAlgorithm.PHOTODNA || algorithm === HashingAlgorithm.NETCLEAN;
-    const hasLicense = (algorithm === HashingAlgorithm.PHOTODNA && photoDNAKey) || 
-                      (algorithm === HashingAlgorithm.NETCLEAN && netCleanKey);
-    
-    const formatDistance = (distance: number) => {
-      if (distance === -1) return "Different";
-      return distance.toFixed(2);
-    };
     
     return (
       <div key={algo} className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex items-start justify-between">
-          <h3 className="text-lg font-semibold mb-2">{description.name}</h3>
-          {isLicensedAlgorithm && (
-            <span className={`px-2 py-1 text-xs rounded ${hasLicense ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-              {hasLicense ? 'Licensed' : 'License Required'}
-            </span>
-          )}
-        </div>
+        <h3 className="text-lg font-semibold mb-2">{description.name}</h3>
         <p className="text-sm text-gray-600 mb-4">{description.description}</p>
         
-        {isLicensedAlgorithm && !hasLicense ? (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-            <p className="text-sm text-yellow-800">
-              {algorithm === HashingAlgorithm.PHOTODNA ? 
-                'PhotoDNA requires Microsoft licensing and approval. Contact Microsoft to request access.' :
-                'NetClean hash format requires licensing. Contact NetClean to request access.'}
-            </p>
-            <a 
-              href={algorithm === HashingAlgorithm.PHOTODNA ? 
-                "https://www.microsoft.com/en-us/photodna" : 
-                "https://www.netclean.com/"}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-blue-600 hover:text-blue-800 mt-2 inline-block"
-            >
-              Learn More
-            </a>
-          </div>
-        ) : result.error ? (
+        {result.error ? (
           <div className="text-red-600">{result.error}</div>
         ) : (
           <div className="space-y-2">
             <div className="flex justify-between">
               <span className="text-gray-600">Distance:</span>
-              <span className="font-medium">{formatDistance(result.distance)}</span>
+              <span className="font-medium">{result.distance.toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Quality (Image 1):</span>
@@ -201,6 +146,7 @@ export default function ImageComparison({
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Image 1 Selection */}
         <div>
           <h3 className="text-lg font-medium mb-4">Image 1</h3>
           <input
@@ -225,6 +171,7 @@ export default function ImageComparison({
           )}
         </div>
 
+        {/* Image 2 Selection */}
         <div>
           <h3 className="text-lg font-medium mb-4">Image 2</h3>
           <input
@@ -250,26 +197,21 @@ export default function ImageComparison({
         </div>
       </div>
 
-      {isLoading && (
-        <div className="text-center text-gray-600">
-          Calculating image distances...
+      {/* Results Section */}
+      {isLoading ? (
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-2 text-gray-600">Comparing images...</p>
         </div>
-      )}
-
-      {error && (
-        <div className="p-4 bg-red-100 text-red-700 rounded-lg">
+      ) : error ? (
+        <div className="bg-red-50 border border-red-200 rounded-md p-4 text-red-700">
           {error}
         </div>
-      )}
-
-      {comparisonResults && comparisonResults.success && (
-        <div className="mt-8">
-          <h2 className="text-2xl font-bold mb-6">Comparison Results</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {Object.entries(comparisonResults.results).map(([algo, result]) => 
-              renderAlgorithmCard(algo, result)
-            )}
-          </div>
+      ) : comparisonResults && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {Object.entries(comparisonResults.results).map(([algo, result]) => 
+            renderAlgorithmCard(algo, result)
+          )}
         </div>
       )}
     </div>

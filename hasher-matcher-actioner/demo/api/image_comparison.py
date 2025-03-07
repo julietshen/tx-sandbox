@@ -24,11 +24,9 @@ import io
 from database import Database
 
 class HashingAlgorithm(str, Enum):
-    PHOTODNA = "photodna"  # Required for NCMEC
-    PDQ = "pdq"  # Optional but recommended
-    MD5 = "md5"  # Optional
-    SHA1 = "sha1"  # Optional
-    NETCLEAN = "netclean"  # Optional
+    PDQ = "pdq"  # Perceptual hash for similar image detection
+    MD5 = "md5"  # Cryptographic hash for exact matching
+    SHA1 = "sha1"  # Cryptographic hash for exact matching
 
 app = FastAPI()
 db = Database()
@@ -46,61 +44,47 @@ app.add_middleware(
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def compute_hash(image: np.ndarray, algorithm: HashingAlgorithm) -> Tuple[str, float]:
+def compute_hash(image: np.ndarray, algorithm: HashingAlgorithm) -> tuple[str, float]:
     """Compute hash using specified algorithm."""
-    # Convert to PIL Image for some algorithms
-    pil_image = Image.fromarray(image)
-    
-    if algorithm == HashingAlgorithm.PHOTODNA:
-        # Note: PhotoDNA requires licensing from Microsoft
-        raise NotImplementedError("PhotoDNA requires licensing from Microsoft")
-    
-    elif algorithm == HashingAlgorithm.PDQ:
-        # Convert image to RGB if it's RGBA
-        if image.shape[-1] == 4:
-            image = image[..., :3]
-        # Ensure image is contiguous and in correct format
-        if not image.flags['C_CONTIGUOUS']:
-            image = np.ascontiguousarray(image)
-        hash_val, quality = pdqhash.compute(image)
-        # Convert numpy array to hex string
-        hash_bytes = hash_val.tobytes()
-        hash_hex = ''.join([f'{x:02x}' for x in hash_bytes])
-        return hash_hex, float(quality)
-    
-    elif algorithm == HashingAlgorithm.MD5:
-        # Convert to bytes and compute MD5
+    try:
+        if algorithm == HashingAlgorithm.PDQ:
+            # Ensure image is RGB and contiguous
+            if image.shape[-1] == 4:
+                image = image[..., :3]
+            if not image.flags['C_CONTIGUOUS']:
+                image = np.ascontiguousarray(image)
+            hash_val, quality = pdqhash.compute(image)
+            hash_hex = ''.join([f'{x:02x}' for x in hash_val.tobytes()])
+            return hash_hex, float(quality)
+        
+        # For cryptographic hashes, use PIL image bytes
+        pil_image = Image.fromarray(image)
         img_bytes = pil_image.tobytes()
-        hash_val = hashlib.md5(img_bytes).hexdigest()
-        return hash_val, 100.0
-    
-    elif algorithm == HashingAlgorithm.SHA1:
-        # Convert to bytes and compute SHA1
-        img_bytes = pil_image.tobytes()
-        hash_val = hashlib.sha1(img_bytes).hexdigest()
-        return hash_val, 100.0
-    
-    elif algorithm == HashingAlgorithm.NETCLEAN:
-        # Note: NetClean requires licensing
-        raise NotImplementedError("NetClean requires licensing")
-    
-    else:
-        raise ValueError(f"Unsupported hashing algorithm: {algorithm}")
+        
+        if algorithm == HashingAlgorithm.MD5:
+            return hashlib.md5(img_bytes).hexdigest(), 100.0
+        elif algorithm == HashingAlgorithm.SHA1:
+            return hashlib.sha1(img_bytes).hexdigest(), 100.0
+        
+        raise ValueError(f"Unsupported algorithm: {algorithm}")
+    except Exception as e:
+        logger.error(f"Error computing {algorithm} hash: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 def calculate_hash_distance(hash1: str, hash2: str, algorithm: HashingAlgorithm) -> float:
-    """Calculate distance between two hashes based on the algorithm used."""
-    if algorithm == HashingAlgorithm.PDQ:
-        # PDQ uses Hamming distance on hex strings
-        hash1_int = int(hash1, 16)
-        hash2_int = int(hash2, 16)
-        return float(bin(hash1_int ^ hash2_int).count('1'))
-    
-    elif algorithm in [HashingAlgorithm.MD5, HashingAlgorithm.SHA1, HashingAlgorithm.NETCLEAN, HashingAlgorithm.PHOTODNA]:
-        # For cryptographic hashes and licensed algorithms, we can only check equality
-        return 0.0 if hash1 == hash2 else -1.0  # Using -1 to represent "different" instead of infinity
-    
-    else:
-        raise ValueError(f"Unsupported hashing algorithm: {algorithm}")
+    """Calculate distance between two hashes."""
+    try:
+        if algorithm == HashingAlgorithm.PDQ:
+            # PDQ uses Hamming distance
+            hash1_int = int(hash1, 16)
+            hash2_int = int(hash2, 16)
+            return float(bin(hash1_int ^ hash2_int).count('1'))
+        else:
+            # For cryptographic hashes, only exact matches matter
+            return 0.0 if hash1 == hash2 else 100.0
+    except Exception as e:
+        logger.error(f"Error calculating distance for {algorithm}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 def image_to_array(image_file: UploadFile) -> np.ndarray:
     """Convert uploaded image to numpy array."""
@@ -142,117 +126,59 @@ def find_available_port(start_port: int = 8000, max_attempts: int = 10) -> int:
     raise RuntimeError(f"Could not find an available port in range {start_port}-{start_port + max_attempts - 1}")
 
 @app.post("/compare")
-async def compare_images(
-    image1: UploadFile = File(...), 
-    image2: UploadFile = File(...),
-    x_photodna_key: Optional[str] = Header(None),
-    x_netclean_key: Optional[str] = Header(None)
-):
-    """Compare two images using all supported HMA algorithms."""
+async def compare_images(image1: UploadFile = File(...), image2: UploadFile = File(...)):
+    """Compare two images using supported hash algorithms."""
     try:
-        # Log incoming request
-        logger.info(f"Comparing images: {image1.filename} and {image2.filename}")
-
         # Convert images to numpy arrays
-        try:
-            img1_array = image_to_array(image1)
-            logger.info(f"Image 1 shape: {img1_array.shape}, dtype: {img1_array.dtype}")
-        except Exception as e:
-            logger.error(f"Error processing image 1: {str(e)}")
-            return {"error": f"Failed to process image 1: {str(e)}"}
-
-        try:
-            img2_array = image_to_array(image2)
-            logger.info(f"Image 2 shape: {img2_array.shape}, dtype: {img2_array.dtype}")
-        except Exception as e:
-            logger.error(f"Error processing image 2: {str(e)}")
-            return {"error": f"Failed to process image 2: {str(e)}"}
-
-        results = {}
+        img1 = np.array(Image.open(io.BytesIO(await image1.read())))
+        img2 = np.array(Image.open(io.BytesIO(await image2.read())))
         
-        # Compute hashes and distances for all algorithms
+        logger.info(f"Comparing images: {image1.filename} and {image2.filename}")
+        logger.info(f"Image shapes: {img1.shape}, {img2.shape}")
+        
+        results = {}
         for algorithm in HashingAlgorithm:
             try:
-                # Skip PhotoDNA if no API key provided
-                if algorithm == HashingAlgorithm.PHOTODNA and not x_photodna_key:
-                    results[algorithm] = {
-                        "error": "PhotoDNA requires a valid API key. Contact Microsoft to request access."
-                    }
-                    continue
-
-                # Skip NetClean if no API key provided
-                if algorithm == HashingAlgorithm.NETCLEAN and not x_netclean_key:
-                    results[algorithm] = {
-                        "error": "NetClean requires a valid API key. Contact NetClean to request access."
-                    }
-                    continue
-
                 # Calculate hashes
-                hash1_val, quality1 = compute_hash(img1_array, algorithm)
-                hash2_val, quality2 = compute_hash(img2_array, algorithm)
+                hash1, quality1 = compute_hash(img1, algorithm)
+                hash2, quality2 = compute_hash(img2, algorithm)
                 
-                # Calculate distance
-                distance = calculate_hash_distance(hash1_val, hash2_val, algorithm)
-                
-                # Get interpretation
+                # Calculate distance and interpretation
+                distance = calculate_hash_distance(hash1, hash2, algorithm)
                 interpretation = get_similarity_interpretation(distance, algorithm)
                 
-                # Store results
                 results[algorithm] = {
-                    "distance": float(distance),
-                    "quality1": float(quality1),
-                    "quality2": float(quality2),
+                    "distance": distance,
+                    "quality1": quality1,
+                    "quality2": quality2,
                     "interpretation": interpretation
                 }
                 
-                # Store hashes in database
-                db.store_hash(hash1_val, {
-                    "source": "compare_endpoint",
-                    "quality": float(quality1),
-                    "algorithm": algorithm
-                })
-                db.store_hash(hash2_val, {
-                    "source": "compare_endpoint",
-                    "quality": float(quality2),
-                    "algorithm": algorithm
-                })
-                
                 logger.info(f"Computed {algorithm} hash with distance: {distance}")
                 
-            except NotImplementedError as e:
-                logger.error(f"Algorithm not implemented: {str(e)}")
-                results[algorithm] = {"error": str(e)}
             except Exception as e:
-                logger.error(f"Error computing {algorithm} hash: {str(e)}")
+                logger.error(f"Error processing {algorithm}: {str(e)}")
                 results[algorithm] = {"error": str(e)}
-
-        return {
-            "results": results,
-            "success": True
-        }
+        
+        return {"results": results, "success": True}
         
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
-        return {"error": f"Unexpected error: {str(e)}"}
+        return {"error": str(e), "success": False}
     finally:
-        image1.file.close()
-        image2.file.close()
+        await image1.close()
+        await image2.close()
 
 def get_similarity_interpretation(distance: float, algorithm: HashingAlgorithm) -> str:
-    """Get human-readable interpretation of the distance based on the algorithm."""
+    """Get human-readable interpretation of the distance."""
     if algorithm == HashingAlgorithm.PDQ:
         if distance <= 30:
             return "Very similar images (likely variations of the same image)"
         elif distance <= 80:
             return "Moderately similar images"
-        else:
-            return "Different images"
-            
-    elif algorithm in [HashingAlgorithm.MD5, HashingAlgorithm.SHA1, HashingAlgorithm.NETCLEAN, HashingAlgorithm.PHOTODNA]:
-        if distance == 0:
-            return "Identical images (exact match)"
-        else:
-            return "Different images"
+        return "Different images"
+    else:
+        return "Exact match" if distance == 0 else "Different images"
 
 @app.post("/find_nearest")
 async def find_nearest_matches(
