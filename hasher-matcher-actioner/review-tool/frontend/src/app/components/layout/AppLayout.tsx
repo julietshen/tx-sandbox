@@ -1,3 +1,5 @@
+'use client';
+
 import { Box, Container, useColorModeValue } from "@chakra-ui/react";
 import NavBar from "./NavBar";
 

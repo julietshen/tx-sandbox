@@ -5,15 +5,25 @@ from typing import List, Optional, Dict, Any
 import io
 import numpy as np
 from PIL import Image as PILImage
-import pdqhash
 import hashlib
 import datetime
 from pydantic import BaseModel
 
 from database import get_db
-from models import Image, Hash, Match, ReviewDecision, ReviewStatus, HashAlgorithm, Review
+from models import Image, Hash, Match, ReviewDecision, ReviewStatus, HashAlgorithm
 from queue_manager import queue_manager
 from queue_config import QueueNames, CONTENT_CATEGORIES, ConfidenceLevels
+from setup_pdq import setup_pdq_path
+
+# Set up PDQ path
+setup_pdq_path()
+try:
+    from pdqhashing.hasher.pdq_hasher import PDQHasher
+    pdq_hasher = PDQHasher()
+    print("PDQ hasher initialized successfully in routes.py")
+except ImportError:
+    print("Warning: PDQ hasher not available. Using fallback methods.")
+    pdq_hasher = None
 
 router = APIRouter()
 
@@ -104,7 +114,7 @@ async def upload_image(file: UploadFile = File(...), db: Session = Depends(get_d
             # Ensure the array is contiguous
             if not rgb_image.flags['C_CONTIGUOUS']:
                 rgb_image = np.ascontiguousarray(rgb_image)
-            pdq_hash, quality = pdqhash.compute(rgb_image)
+            pdq_hash, quality = pdq_hasher.compute(rgb_image)
             hash_hex = ''.join([f'{x:02x}' for x in pdq_hash.tobytes()])
             
             db_hash = Hash(

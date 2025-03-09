@@ -16,6 +16,17 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from queue_manager import queue_manager
 from queue_config import CONTENT_CATEGORIES, QueueNames, ConfidenceLevels
+from setup_pdq import setup_pdq_path
+
+# Import PDQ
+setup_pdq_path()
+try:
+    from pdqhashing.hasher.pdq_hasher import PDQHasher
+    pdq_hasher = PDQHasher()
+    print("PDQ hasher initialized successfully.")
+except ImportError:
+    print("Warning: PDQ hasher not available. Using simulated PDQ.")
+    pdq_hasher = None
 
 # Path to test images - adjust these paths to match your environment
 DEMO_PATH = Path("../demo")
@@ -35,6 +46,35 @@ if not TEST_IMAGES_PATH.exists() or not VARIATIONS_PATH.exists():
     print("Please run this script from the backend directory.")
     sys.exit(1)
 
+def compute_pdq_hash(image_path):
+    """
+    Compute PDQ hash for an image using the real PDQ implementation.
+    
+    Args:
+        image_path: Path to the image file
+        
+    Returns:
+        Hash string and quality
+    """
+    if pdq_hasher:
+        try:
+            # Use the real PDQ hasher
+            result = pdq_hasher.fromFile(str(image_path))
+            if result:
+                hash_obj = result.getHash()
+                quality = result.getQuality()
+                # Convert hash to hexadecimal string
+                hash_str = format(int(str(hash_obj), 2), 'x').zfill(64)
+                return hash_str, quality
+        except Exception as e:
+            print(f"Error computing PDQ hash: {e}")
+    
+    # Fallback to simple hash if PDQ fails or is not available
+    import hashlib
+    with open(image_path, 'rb') as f:
+        hash_obj = hashlib.md5(f.read())
+    return hash_obj.hexdigest(), 100.0
+
 def get_test_images():
     """Get the list of test images and their variations."""
     # Get all test images
@@ -49,6 +89,9 @@ def create_image_entry(image_path, image_id):
     """Create a simple image entry for testing."""
     filename = os.path.basename(image_path)
     
+    # Compute PDQ hash
+    hash_str, quality = compute_pdq_hash(image_path)
+    
     # Assign random hash algorithm to each image
     hash_algorithm = random.choice(QueueNames.get_hash_types())
     
@@ -56,6 +99,8 @@ def create_image_entry(image_path, image_id):
         "id": image_id,
         "filename": filename,
         "hash_algorithm": hash_algorithm,
+        "hash": hash_str,
+        "quality": quality,
         "path": image_path
     }
 
@@ -99,6 +144,8 @@ def seed_queues():
             metadata = {
                 "source": "seed_script",
                 "test_image": True,
+                "hash": image["hash"],
+                "quality": image["quality"],
                 "timestamp": time.time()
             }
             
