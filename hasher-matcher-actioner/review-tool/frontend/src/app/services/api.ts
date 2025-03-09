@@ -1,5 +1,5 @@
 import { QueueStats, QueueConfig } from '../types/queue';
-import { getMockQueueStats, getMockQueueConfig } from '../utils/mockData';
+import { getMockQueueStats, getMockQueueConfig, getMockTask } from '../utils/mockData';
 
 /**
  * Global flag for using mock data instead of real API calls
@@ -77,42 +77,16 @@ export const QueueAPI = {
   },
 
   /**
-   * Get the next task from the queue based on filters
+   * Get the next task from the queue
    */
-  getNextTask: async (params?: {
-    contentCategories?: string[];
-    hashAlgorithms?: string[];
-    confidenceLevels?: string[];
-    isEscalated?: boolean;
-  }) => {
-    // Build query string
-    const queryParams = new URLSearchParams();
-    
-    if (params?.contentCategories) {
-      params.contentCategories.forEach(category => {
-        queryParams.append('content_categories', category);
-      });
+  getNextTask: async () => {
+    if (useMockData) {
+      // Get task from mock data
+      const { task } = getMockTask();
+      return task;
     }
     
-    if (params?.hashAlgorithms) {
-      params.hashAlgorithms.forEach(algo => {
-        queryParams.append('hash_algorithms', algo);
-      });
-    }
-    
-    if (params?.confidenceLevels) {
-      params.confidenceLevels.forEach(level => {
-        queryParams.append('confidence_levels', level);
-      });
-    }
-    
-    if (params?.isEscalated !== undefined) {
-      queryParams.append('is_escalated', params.isEscalated.toString());
-    }
-    
-    const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
-    
-    return apiCall(`/queues/tasks/next${queryString}`);
+    return apiCall(`/queues/next`);
   },
 
   /**

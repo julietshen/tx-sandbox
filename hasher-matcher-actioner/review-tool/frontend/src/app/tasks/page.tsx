@@ -1,11 +1,10 @@
+'use client';
+
 function getMockTasks(count = 10) {
   const categories = [
-    'hate_speech',
-    'sexual_content',
-    'violence',
-    'harassment',
-    'spam',
-    'misinformation',
+    'fowl_play',
+    'wild_duckery',
+    'rotten_eggs',
   ];
   
   const hashAlgorithms = ['pdq', 'md5', 'sha256'];
@@ -69,8 +68,6 @@ function getMockTasks(count = 10) {
 }
 
 // Add the Tasks page component
-'use client';
-
 import { useState, useEffect } from 'react';
 import { Box, Container, Heading, SimpleGrid, Card, CardHeader, CardBody, Text, Image, Badge, Flex, Button, useToast, Spinner, Center } from '@chakra-ui/react';
 import { useRouter } from 'next/navigation';
@@ -117,12 +114,9 @@ export default function TasksPage() {
   // Function to get badge color based on category
   const getCategoryColor = (category) => {
     const colorMap = {
-      'hate_speech': 'red',
-      'sexual_content': 'pink',
-      'violence': 'orange',
-      'harassment': 'purple',
-      'spam': 'blue',
-      'misinformation': 'teal',
+      'fowl_play': 'red',
+      'wild_duckery': 'blue',
+      'rotten_eggs': 'yellow',
     };
     return colorMap[category] || 'gray';
   };

@@ -47,13 +47,9 @@ export const mockTaskAges = [
  * Mock content categories
  */
 export const mockCategories = [
-  'adult', 
-  'violence', 
-  'hate_speech', 
-  'terrorism', 
-  'self_harm', 
-  'spam', 
-  'other'
+  'fowl_play',
+  'wild_duckery',
+  'rotten_eggs'
 ];
 
 /**
@@ -140,23 +136,20 @@ export function getMockQueueConfig(): QueueConfig {
  * Get a description for a content category
  */
 export function getMockCategoryDescription(category: string): string {
-  switch (category.toLowerCase()) {
-    case 'hate_speech':
-      return 'Content that promotes hatred, violence, or discrimination based on protected characteristics';
-    case 'adult':
-      return 'Content containing sexually explicit material not suitable for all audiences';
-    case 'violence':
-      return 'Content depicting graphic violence, gore, or extreme physical harm';
-    case 'terrorism':
-      return 'Content promoting terrorist activities, violent extremism, or terrorist organizations';
-    case 'self_harm':
-      return 'Content depicting, encouraging, or glorifying self-harm or suicide';
-    case 'spam':
-      return 'Unwanted, unsolicited, or repetitive content with commercial or misleading intent';
-    case 'other':
-      return 'Content that may violate policies but doesn\'t fall into other specific categories';
+  const lowerCategory = category.toLowerCase();
+  
+  switch (lowerCategory) {
+    case 'fowl_play':
+      return 'Content that contains suspicious chicken-related activities or bird-themed humor';
+    
+    case 'wild_duckery':
+      return 'Content with excessive waterfowl antics or questionable duck behavior';
+    
+    case 'rotten_eggs':
+      return 'Content featuring spoiled breakfast ingredients or egg-related offenses';
+    
     default:
-      return `${category.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')} content requiring review`;
+      return 'Content that violates our policies';
   }
 }
 
@@ -170,7 +163,7 @@ export function getMockTask(
   showEscalated?: boolean
 ): { task: QueueTask, image: Image, matches: Match[], similarImages: Image[] } {
   // Use the provided filters or defaults
-  const category = selectedCategory || 'hate_speech';
+  const category = selectedCategory || 'fowl_play';
   const hashAlgorithm = selectedHashAlgorithm || 'pdq';
   const confidenceLevel = selectedConfidenceLevel || 'high';
   const isEscalated = showEscalated || false;

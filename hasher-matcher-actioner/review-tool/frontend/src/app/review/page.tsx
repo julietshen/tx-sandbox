@@ -62,21 +62,17 @@ export default function ReviewPage() {
   const [error, setError] = useState('');
   const [remainingCount, setRemainingCount] = useState(0);
   
-  // Filter state
+  // Queue configuration
   const [config, setConfig] = useState<QueueConfig | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [selectedHashAlgorithm, setSelectedHashAlgorithm] = useState<string>('');
-  const [selectedConfidenceLevel, setSelectedConfidenceLevel] = useState<string>('');
-  const [showEscalated, setShowEscalated] = useState<boolean>(false);
   
   // Get queue name for display
   const getQueueDisplayName = () => {
-    if (selectedCategory && selectedHashAlgorithm) {
-      const category = selectedCategory.split('_').map(
+    if (currentTask?.content_category && currentTask?.algorithm) {
+      const category = currentTask.content_category.split('_').map(
         word => word.charAt(0).toUpperCase() + word.slice(1)
       ).join(' ');
       
-      const algorithm = selectedHashAlgorithm.toUpperCase();
+      const algorithm = currentTask.algorithm.toUpperCase();
       
       return `${category} (${algorithm})`;
     }
@@ -107,23 +103,10 @@ export default function ReviewPage() {
         }
       }
       
-      // Prepare filters for API call
-      const filters: {
-        contentCategories?: string[];
-        hashAlgorithms?: string[];
-        confidenceLevels?: string[];
-        isEscalated?: boolean;
-      } = {};
-      
-      if (selectedCategory) filters.contentCategories = [selectedCategory];
-      if (selectedHashAlgorithm) filters.hashAlgorithms = [selectedHashAlgorithm];
-      if (selectedConfidenceLevel) filters.confidenceLevels = [selectedConfidenceLevel];
-      if (showEscalated) filters.isEscalated = true;
-      
       // Fetch next task
       let taskData;
       try {
-        taskData = await QueueAPI.getNextTask(filters);
+        taskData = await QueueAPI.getNextTask();
       } catch (err) {
         console.error('Failed to fetch next task', err);
         throw new Error('Failed to fetch the next review task');
@@ -158,11 +141,7 @@ export default function ReviewPage() {
         
         // Get remaining count in queue
         try {
-          const statsData = await QueueAPI.getQueueStats({
-            contentCategory: selectedCategory,
-            hashAlgorithm: selectedHashAlgorithm,
-            isEscalated: showEscalated
-          });
+          const statsData = await QueueAPI.getQueueStats();
           
           if (statsData && statsData.length > 0) {
             setRemainingCount(statsData[0].pending || 0);
@@ -192,23 +171,12 @@ export default function ReviewPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedCategory, selectedHashAlgorithm, selectedConfidenceLevel, showEscalated, config]);
+  }, [config]);
 
   // Fetch initial data
   useEffect(() => {
     // Start with loading state
     setLoading(true);
-    
-    // Parse search params to set initial filters
-    const category = searchParams.get('category');
-    const algorithm = searchParams.get('algorithm');
-    const confidence = searchParams.get('confidence');
-    const escalated = searchParams.get('escalated') === 'true';
-    
-    if (category) setSelectedCategory(category);
-    if (algorithm) setSelectedHashAlgorithm(algorithm);
-    if (confidence) setSelectedConfidenceLevel(confidence);
-    if (escalated) setShowEscalated(true);
     
     // Just use mock data - keep it simple
     useMockData();
@@ -216,7 +184,7 @@ export default function ReviewPage() {
     // Set loading to false
     setLoading(false);
     
-  }, [searchParams]);
+  }, []);
 
   // Handle review action completion
   const completeReview = async (
@@ -272,16 +240,16 @@ export default function ReviewPage() {
     setCurrentTask({
       id: 'mock-task-123',
       image_id: 1,
-      content_category: selectedCategory || 'hate_speech',
-      hash_algorithm: selectedHashAlgorithm || 'pdq',
-      confidence_level: selectedConfidenceLevel || 'high',
-      is_escalated: showEscalated,
+      content_category: 'fowl_play',
+      hash_algorithm: 'pdq',
+      confidence_level: 'high',
+      is_escalated: false,
       status: 'pending',
       created_at: new Date().toISOString(),
       metadata: {
-        source: 'Mock Source',
-        reporter: 'System',
-        report_reason: 'Potentially violating content'
+        source: 'Source 1',
+        reporter: 'User',
+        report_reason: 'Reason 1'
       }
     });
     
@@ -297,7 +265,7 @@ export default function ReviewPage() {
       mime_type: 'image/jpeg',
       hashes: [
         {
-          algorithm: selectedHashAlgorithm || 'pdq',
+          algorithm: 'pdq',
           hash: 'f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6',
           quality: 90
         }
@@ -308,7 +276,7 @@ export default function ReviewPage() {
     setMatches([
       {
         match_id: 'm1',
-        hash_algorithm: selectedHashAlgorithm || 'pdq',
+        hash_algorithm: 'pdq',
         match_hash: 'f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6',
         distance: 5,
         reference_id: 'ref123',
@@ -335,7 +303,7 @@ export default function ReviewPage() {
         mime_type: 'image/jpeg',
         hashes: [
           {
-            algorithm: selectedHashAlgorithm || 'pdq',
+            algorithm: 'pdq',
             hash: 'f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7',
             quality: 85
           }
@@ -352,7 +320,7 @@ export default function ReviewPage() {
         mime_type: 'image/jpeg',
         hashes: [
           {
-            algorithm: selectedHashAlgorithm || 'pdq',
+            algorithm: 'pdq',
             hash: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6',
             quality: 88
           }
@@ -405,25 +373,6 @@ export default function ReviewPage() {
     } finally {
       setSubmitting(false);
     }
-  };
-  
-  // Handle filter changes
-  const handleFilterChange = () => {
-    // Update URL with new filters
-    const params = new URLSearchParams();
-    if (selectedCategory) params.append('category', selectedCategory);
-    if (selectedHashAlgorithm) params.append('algorithm', selectedHashAlgorithm);
-    if (selectedConfidenceLevel) params.append('confidence', selectedConfidenceLevel);
-    if (showEscalated) params.append('escalated', 'true');
-    
-    window.history.replaceState(
-      {},
-      '',
-      `${window.location.pathname}?${params.toString()}`
-    );
-    
-    // Fetch next task with new filters
-    fetchNextTask();
   };
   
   // Color mode
@@ -480,62 +429,6 @@ export default function ReviewPage() {
           </Button>
         </HStack>
       </Flex>
-      
-      {/* Filter Controls */}
-      <Box mb={6} p={4} borderWidth="1px" borderRadius="md" borderColor={borderColor} bg={cardBg}>
-        <Flex gap={4} wrap={{ base: 'wrap', md: 'nowrap' }}>
-          <Select
-            placeholder="Content Category"
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            disabled={loading || submitting}
-            size="sm"
-          >
-            {config?.contentCategories.map((category) => (
-              <option key={category} value={category}>
-                {category.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-              </option>
-            ))}
-          </Select>
-          
-          <Select
-            placeholder="Hash Algorithm"
-            value={selectedHashAlgorithm}
-            onChange={(e) => setSelectedHashAlgorithm(e.target.value)}
-            disabled={loading || submitting}
-            size="sm"
-          >
-            {config?.hashAlgorithms.map((algo) => (
-              <option key={algo} value={algo}>
-                {algo.toUpperCase()}
-              </option>
-            ))}
-          </Select>
-          
-          <Select
-            placeholder="Confidence Level"
-            value={selectedConfidenceLevel}
-            onChange={(e) => setSelectedConfidenceLevel(e.target.value)}
-            disabled={loading || submitting}
-            size="sm"
-          >
-            {config?.confidenceLevels.map((level) => (
-              <option key={level} value={level}>
-                {level.charAt(0).toUpperCase() + level.slice(1)}
-              </option>
-            ))}
-          </Select>
-          
-          <Button
-            colorScheme="blue"
-            onClick={handleFilterChange}
-            isLoading={loading}
-            size="sm"
-          >
-            Apply Filters
-          </Button>
-        </Flex>
-      </Box>
       
       {/* Error Message */}
       {error && (

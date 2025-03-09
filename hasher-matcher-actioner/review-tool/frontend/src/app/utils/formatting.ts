@@ -61,16 +61,15 @@ export function getAlgorithmColor(algorithm: string): string {
 }
 
 /**
- * Get a color for a content category
+ * Returns a color scheme for a specific category
+ * @param category The content category
+ * @returns A Chakra UI color scheme name
  */
 export function getCategoryColor(category: string): string {
   switch (category.toLowerCase()) {
-    case 'hate_speech': return 'red';
-    case 'adult': return 'pink';
-    case 'violence': return 'orange';
-    case 'terrorism': return 'purple';
-    case 'self_harm': return 'teal';
-    case 'spam': return 'blue';
+    case 'fowl_play': return 'red';
+    case 'wild_duckery': return 'blue';
+    case 'rotten_eggs': return 'yellow';
     default: return 'gray';
   }
 } 

@@ -98,7 +98,7 @@ const Dashboard = () => {
 
   // Function to use mock data for development/demo
   const useMockData = () => {
-    const mockCategories = ['adult', 'violence', 'hate_speech', 'terrorism', 'self_harm', 'spam', 'other'];
+    const mockCategories = ['fowl_play', 'wild_duckery', 'rotten_eggs'];
     const mockHashTypes = ['pdq', 'md5', 'sha1', 'escalated', 'manual'];
     const mockConfidenceLevels = ['high', 'medium', 'low'];
     
@@ -245,41 +245,30 @@ const Dashboard = () => {
     }
   };
   
-  // Function to get badge color based on content category
-  const getCategoryColor = (category: string): string => {
+  // Function to get category color
+  const getCategoryColor = (category: string) => {
     switch (category.toLowerCase()) {
-      case 'hate_speech': return 'red';
-      case 'violence': return 'orange';
-      case 'terrorism': return 'red';
-      case 'adult': return 'pink';
-      case 'sexual_content': return 'pink';
-      case 'harassment': return 'purple';
-      case 'self_harm': return 'red';
-      case 'spam': return 'blue';
-      case 'misinformation': return 'teal';
+      case 'fowl_play': return 'red';
+      case 'wild_duckery': return 'blue';
+      case 'rotten_eggs': return 'yellow';
       default: return 'gray';
     }
   };
 
-  // Function to get a detailed description for a content category
-  const getCategoryDescription = (category: string): string => {
+  // Function to get category description
+  const getCategoryDescription = (category: string) => {
     switch (category.toLowerCase()) {
-      case 'hate_speech':
-        return 'Content that promotes hatred, violence, or discrimination based on protected characteristics';
-      case 'adult':
-        return 'Content containing sexually explicit material not suitable for all audiences';
-      case 'violence':
-        return 'Content depicting graphic violence, gore, or extreme physical harm';
-      case 'terrorism':
-        return 'Content promoting terrorist activities, violent extremism, or terrorist organizations';
-      case 'self_harm':
-        return 'Content depicting, encouraging, or glorifying self-harm or suicide';
-      case 'spam':
-        return 'Unwanted, unsolicited, or repetitive content with commercial or misleading intent';
-      case 'other':
-        return 'Content that may violate policies but doesn\'t fall into other specific categories';
+      case 'fowl_play':
+        return 'Content that contains suspicious chicken-related activities or bird-themed humor';
+      
+      case 'wild_duckery':
+        return 'Content with excessive waterfowl antics or questionable duck behavior';
+      
+      case 'rotten_eggs':
+        return 'Content featuring spoiled breakfast ingredients or egg-related offenses';
+      
       default:
-        return `${category.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')} content requiring review`;
+        return 'Content that violates our policies';
     }
   };
 
