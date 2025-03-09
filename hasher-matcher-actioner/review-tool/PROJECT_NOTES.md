@@ -102,6 +102,17 @@
 - Set image publish dates to align with task ages
 - Made similar content section open task details in new tab
 
+### 9. Additional UI and State Management Enhancements (March 2024)
+- Implemented persistent state tracking across pages using localStorage
+- Fixed task count display to properly show all 13 tasks distributed across categories
+- Added automatic state updates when tasks are completed (removed from pending counts)
+- Improved reset functionality to properly restore tasks to pending state
+- Made descriptive IDs for matches with tooltips explaining their purpose
+- Removed redundant metadata display from image cards
+- Implemented proper formatting for category names in match details
+- Fixed hover effects on queue cards to prevent unintended color changes
+- Ensured consistency between task counts in review tool and dashboard
+
 ## Issues Encountered
 
 ### 1. Chakra UI Integration Issues
@@ -206,6 +217,61 @@
 - Moved the 'use client' directive to the very top of the file, before any other code
 - Ensured that all client components have the directive properly positioned
 - Added validation checks to prevent similar issues in other components
+
+### 7. Circular Dependencies in React Hooks
+
+#### Problem:
+- Encountered an error: "Cannot access 'useMockData' before initialization"
+- This occurred because a function reference was included in a dependency array before it was defined
+
+#### Root Cause:
+- The issue happened due to a naming conflict between:
+  - An imported constant `useMockData` from api.ts
+  - A locally defined callback function also named `useMockData`
+- When the local function tried to reference itself in a dependency array, it created a circular dependency
+
+#### Solution:
+- Renamed the local function to `loadMockData` to avoid the naming conflict
+- Ensured proper order of function definitions to prevent circular references
+- Added comments to highlight the reason for the name change
+
+### 8. Task Count Synchronization Issues
+
+#### Problem:
+- Dashboard was showing fixed/hardcoded task counts regardless of actual state
+- Completed tasks weren't being reflected in the dashboard view when returning from the review page
+- Reset functionality didn't properly restore tasks to pending state
+
+#### Root Cause:
+- Dashboard was using hardcoded counts based on indices instead of actual data
+- No state persistence mechanism between pages to track task completions
+- No proper tracking of which tasks belonged to which category
+
+#### Solution:
+- Implemented localStorage to persist task state across different pages:
+  - `completedTasks` array to track which tasks have been completed
+  - `dashboardStats` object to track counts by category
+- Updated dashboard to display actual task counts from localStorage
+- Modified the reset function to properly clear all stored state
+- Added initialization logic to set up proper counts when first loading
+
+### 9. UI Consistency and Layout Issues
+
+#### Problem:
+- Redundant metadata display showing the same information twice
+- Inconsistent formatting of category names in different parts of the app
+- Queue items changed color on hover, creating an unintended UI effect
+
+#### Root Cause:
+- Multiple components displaying the same metadata independently
+- Lack of shared formatting utilities across components
+- CSS hover effect added to table rows without being requested
+
+#### Solution:
+- Removed duplicate metadata display from ImageCard component
+- Added a `formatCategory` utility function to standardize category name display
+- Removed the hover effect on queue items in the dashboard
+- Made match/reference IDs more descriptive with tooltips explaining their purpose
 
 ## User Feedback & Requirements
 
