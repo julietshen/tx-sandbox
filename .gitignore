@@ -21,3 +21,4 @@ pdq/java/bazel-testlogs/
 .idea/
 venv/
 .venv/
+hasher-matcher-actioner/review-tool/PROJECT_NOTES.md
