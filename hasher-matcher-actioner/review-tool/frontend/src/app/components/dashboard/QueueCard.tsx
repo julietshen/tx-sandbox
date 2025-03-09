@@ -13,25 +13,19 @@ import {
   Button,
   useColorModeValue,
 } from '@chakra-ui/react';
-
-interface QueueStats {
-  queueName: string;
-  contentCategory: string;
-  hashAlgorithm: string;
-  isEscalated: boolean;
-  pending: number;
-  active: number;
-  completed: number;
-  successRate: number;
-  oldestTaskAge: number;
-}
+import { QueueStats } from '../../types/queue';
 
 interface QueueCardProps {
   queue: QueueStats;
   formatDuration: (seconds: number) => string;
+  onReviewNext: (queueName: string) => void;
 }
 
-export const QueueCard: React.FC<QueueCardProps> = ({ queue, formatDuration }) => {
+export const QueueCard: React.FC<QueueCardProps> = ({ 
+  queue, 
+  formatDuration,
+  onReviewNext
+}) => {
   const {
     queueName,
     contentCategory,
@@ -74,6 +68,11 @@ export const QueueCard: React.FC<QueueCardProps> = ({ queue, formatDuration }) =
       case 'manual': return 'orange';
       default: return 'gray';
     }
+  };
+
+  // Handle review button click
+  const handleReviewClick = () => {
+    onReviewNext(queueName);
   };
 
   // Styles
@@ -164,6 +163,7 @@ export const QueueCard: React.FC<QueueCardProps> = ({ queue, formatDuration }) =
           size="sm" 
           width="full"
           isDisabled={pending === 0}
+          onClick={handleReviewClick}
         >
           {pending > 0 ? `Review Next Task (${pending})` : 'No Tasks Available'}
         </Button>

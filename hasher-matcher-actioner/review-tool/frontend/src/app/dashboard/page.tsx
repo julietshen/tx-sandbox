@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Heading,
@@ -19,37 +19,22 @@ import {
   Center,
   Alert,
   AlertIcon,
-  Badge,
+  Button,
+  useToast,
 } from '@chakra-ui/react';
 import AppLayout from '../components/layout/AppLayout';
 import { QueueCard } from '../components/dashboard/QueueCard';
 import { FilterBar } from '../components/dashboard/FilterBar';
 import { StatsOverview } from '../components/dashboard/StatsOverview';
-
-// Types
-interface QueueStats {
-  queueName: string;
-  contentCategory: string;
-  hashAlgorithm: string;
-  isEscalated: boolean;
-  pending: number;
-  active: number;
-  completed: number;
-  successRate: number;
-  oldestTaskAge: number;
-}
-
-interface QueueConfig {
-  hashAlgorithms: string[];
-  contentCategories: string[];
-  confidenceLevels: string[];
-}
+import { QueueAPI } from '../services/api';
+import { QueueStats, QueueConfig } from '../types/queue';
 
 const Dashboard = () => {
   const [stats, setStats] = useState<QueueStats[]>([]);
   const [config, setConfig] = useState<QueueConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const toast = useToast();
   
   // Filters
   const [selectedCategory, setSelectedCategory] = useState<string>('');
@@ -58,8 +43,46 @@ const Dashboard = () => {
   const [showEscalated, setShowEscalated] = useState<boolean>(false);
   const [sortBy, setSortBy] = useState<string>('oldest');
 
-  useEffect(() => {
-    // Mock data for development - replace with actual API calls
+  // Function to fetch dashboard data from the API
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      // In production, use the real API:
+      const statsParams: any = {};
+      if (selectedCategory) statsParams.contentCategory = selectedCategory;
+      if (selectedHashAlgorithm) statsParams.hashAlgorithm = selectedHashAlgorithm;
+      statsParams.isEscalated = showEscalated;
+
+      const [statsData, configData] = await Promise.all([
+        QueueAPI.getQueueStats(statsParams),
+        QueueAPI.getQueueConfig()
+      ]);
+      
+      setStats(statsData);
+      setConfig(configData);
+    } catch (err) {
+      console.error('Failed to load dashboard data', err);
+      setError('Failed to load dashboard data. Please try again later.');
+      
+      toast({
+        title: 'Error',
+        description: 'Failed to load dashboard data. Please try again later.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+      
+      // For development/demo fallback: use mock data when API fails
+      useMockData();
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedCategory, selectedHashAlgorithm, showEscalated, toast]);
+
+  // Function to use mock data for development/demo
+  const useMockData = () => {
     const mockCategories = ['adult', 'violence', 'hate_speech', 'terrorism', 'self_harm', 'spam', 'other'];
     const mockHashTypes = ['pdq', 'md5', 'sha1', 'escalated', 'manual'];
     const mockConfidenceLevels = ['high', 'medium', 'low'];
@@ -70,7 +93,7 @@ const Dashboard = () => {
     mockCategories.forEach(category => {
       mockHashTypes.forEach(hash => {
         // Skip escalated for normal queues
-        if (hash === 'escalated' && !showEscalated) continue;
+        if (hash === 'escalated' && !showEscalated) return;
         
         const isEsc = hash === 'escalated';
         mockStats.push({
@@ -93,36 +116,25 @@ const Dashboard = () => {
       contentCategories: mockCategories,
       confidenceLevels: mockConfidenceLevels
     });
-    setLoading(false);
     
-    // In production, replace with:
-    // const fetchData = async () => {
-    //   try {
-    //     setLoading(true);
-    //     const [statsResponse, configResponse] = await Promise.all([
-    //       fetch('/api/queues/stats'),
-    //       fetch('/api/queues/config')
-    //     ]);
-    //     
-    //     if (!statsResponse.ok || !configResponse.ok) {
-    //       throw new Error('Failed to fetch queue data');
-    //     }
-    //     
-    //     const statsData = await statsResponse.json();
-    //     const configData = await configResponse.json();
-    //     
-    //     setStats(statsData);
-    //     setConfig(configData);
-    //   } catch (err) {
-    //     setError('Failed to load dashboard data');
-    //     console.error(err);
-    //   } finally {
-    //     setLoading(false);
-    //   }
-    // };
-    // 
-    // fetchData();
-  }, [showEscalated]); // Re-fetch when escalated filter changes
+    toast({
+      title: 'Using Demo Data',
+      description: 'Connected to API failed. Using demo data instead.',
+      status: 'info',
+      duration: 5000,
+      isClosable: true,
+    });
+  };
+
+  // Fetch data on component mount and when filters change
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  // Function to handle refresh button click
+  const handleRefresh = () => {
+    fetchDashboardData();
+  };
 
   // Filter and sort the stats
   const filteredStats = stats.filter(queue => {
@@ -179,21 +191,27 @@ const Dashboard = () => {
     );
   }
 
-  if (error) {
-    return (
-      <AppLayout>
-        <Alert status="error" my={4}>
-          <AlertIcon />
-          {error}
-        </Alert>
-      </AppLayout>
-    );
-  }
-
   return (
     <AppLayout>
       <Box p={4} bg={bgColor} minH="calc(100vh - 100px)">
-        <Heading mb={6}>Review Queues Dashboard</Heading>
+        <Flex justifyContent="space-between" alignItems="center" mb={6}>
+          <Heading>Review Queues Dashboard</Heading>
+          <Button 
+            colorScheme="blue" 
+            onClick={handleRefresh} 
+            isLoading={loading}
+            leftIcon={<span>🔄</span>}
+          >
+            Refresh
+          </Button>
+        </Flex>
+        
+        {error && (
+          <Alert status="error" mb={6}>
+            <AlertIcon />
+            {error}
+          </Alert>
+        )}
         
         {/* Stats Overview */}
         <StatsOverview 
@@ -236,32 +254,62 @@ const Dashboard = () => {
           <TabPanels>
             {/* All Categories Panel */}
             <TabPanel>
-              <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
-                {sortedStats.map((queue) => (
-                  <QueueCard
-                    key={queue.queueName}
-                    queue={queue}
-                    formatDuration={formatDuration}
-                  />
-                ))}
-              </SimpleGrid>
+              {sortedStats.length > 0 ? (
+                <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
+                  {sortedStats.map((queue) => (
+                    <QueueCard
+                      key={queue.queueName}
+                      queue={queue}
+                      formatDuration={formatDuration}
+                      onReviewNext={(queueName) => {
+                        toast({
+                          title: 'Review Next Task',
+                          description: `Navigating to review page for queue: ${queueName}`,
+                          status: 'info',
+                          duration: 3000,
+                        });
+                        // In the future, implement navigation to review page with queue filter
+                      }}
+                    />
+                  ))}
+                </SimpleGrid>
+              ) : (
+                <Center p={8}>
+                  <Text>No queues match the current filters.</Text>
+                </Center>
+              )}
             </TabPanel>
             
             {/* Category-specific Panels */}
             {config?.contentCategories.map(category => (
               <TabPanel key={category}>
-                <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
-                  {sortedStats
-                    .filter(q => q.contentCategory === category)
-                    .map((queue) => (
-                      <QueueCard
-                        key={queue.queueName}
-                        queue={queue}
-                        formatDuration={formatDuration}
-                      />
-                    ))
-                  }
-                </SimpleGrid>
+                {sortedStats.filter(q => q.contentCategory === category).length > 0 ? (
+                  <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
+                    {sortedStats
+                      .filter(q => q.contentCategory === category)
+                      .map((queue) => (
+                        <QueueCard
+                          key={queue.queueName}
+                          queue={queue}
+                          formatDuration={formatDuration}
+                          onReviewNext={(queueName) => {
+                            toast({
+                              title: 'Review Next Task',
+                              description: `Navigating to review page for queue: ${queueName}`,
+                              status: 'info',
+                              duration: 3000,
+                            });
+                            // In the future, implement navigation to review page with queue filter
+                          }}
+                        />
+                      ))
+                    }
+                  </SimpleGrid>
+                ) : (
+                  <Center p={8}>
+                    <Text>No queues in this category match the current filters.</Text>
+                  </Center>
+                )}
               </TabPanel>
             ))}
           </TabPanels>
