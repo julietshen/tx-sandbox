@@ -6,3 +6,5 @@ python-multipart==0.0.6
 pillow==10.0.1
 pdqhash==0.2.0
 numpy==1.26.0
+redis==4.6.0
+fastapi-cache2==0.2.1

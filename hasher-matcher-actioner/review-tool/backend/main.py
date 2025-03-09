@@ -3,11 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import os
 
-from database import engine, Base
 from routes import router
+from database import init_db
+from queue_config import init_app as init_queue
 
 # Create tables
-Base.metadata.create_all(bind=engine)
+init_db()
 
 app = FastAPI(
     title="HMA Review Tool API",
@@ -18,7 +19,7 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
+    allow_origins=["*"],  # In production, you should specify allowed origins
     allow_credentials=True,
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
@@ -26,6 +27,9 @@ app.add_middleware(
 
 # Include routers
 app.include_router(router, prefix="/api/v1")
+
+# Initialize queue system
+init_queue(app)
 
 @app.get("/")
 async def root():

@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker, relationship
 import datetime
 
 # Create SQLite database engine
-SQLALCHEMY_DATABASE_URL = "sqlite:///./review_tool.db"
+SQLALCHEMY_DATABASE_URL = "sqlite:///./hma_review.db"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 
 # Create session factory
@@ -20,3 +20,7 @@ def get_db():
         yield db
     finally:
         db.close()
+
+def init_db():
+    """Initialize database tables."""
+    Base.metadata.create_all(bind=engine)
