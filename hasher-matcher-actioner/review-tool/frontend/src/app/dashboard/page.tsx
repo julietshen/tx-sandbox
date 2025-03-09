@@ -194,15 +194,19 @@ const Dashboard = () => {
   return (
     <AppLayout>
       <Box p={4} bg={bgColor} minH="calc(100vh - 100px)">
-        <Flex justifyContent="space-between" alignItems="center" mb={6}>
-          <Heading>Review Queues Dashboard</Heading>
+        <Flex justifyContent="space-between" alignItems="center" mb={2}>
+          <Box>
+            <Heading size="xl">Moderation Dashboard</Heading>
+            <Text color="gray.600" mt={1} mb={4}>
+              Moderation queues allow you to manually review content and users one at a time
+            </Text>
+          </Box>
           <Button 
-            colorScheme="blue" 
-            onClick={handleRefresh} 
-            isLoading={loading}
-            leftIcon={<span>🔄</span>}
+            colorScheme="purple" 
+            size="md"
+            borderRadius="md"
           >
-            Refresh
+            Create Queue
           </Button>
         </Flex>
         
@@ -224,130 +228,115 @@ const Dashboard = () => {
         />
         
         {/* Filters */}
-        <FilterBar
-          categories={config?.contentCategories || []}
-          hashAlgorithms={config?.hashAlgorithms || []}
-          confidenceLevels={config?.confidenceLevels || []}
-          selectedCategory={selectedCategory}
-          selectedHashAlgorithm={selectedHashAlgorithm}
-          selectedConfidenceLevel={selectedConfidenceLevel}
-          showEscalated={showEscalated}
-          sortBy={sortBy}
-          onCategoryChange={setSelectedCategory}
-          onHashAlgorithmChange={setSelectedHashAlgorithm}
-          onConfidenceLevelChange={setSelectedConfidenceLevel}
-          onEscalatedChange={setShowEscalated}
-          onSortByChange={setSortBy}
-        />
+        <Flex justify="flex-end" mb={4}>
+          <Button 
+            leftIcon={<span>🔄</span>}
+            colorScheme="blue" 
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh} 
+            isLoading={loading}
+            mr={2}
+          >
+            Refresh
+          </Button>
+          <Button
+            leftIcon={<span>🔍</span>}
+            colorScheme="gray"
+            variant="outline"
+            size="sm"
+          >
+            Filter
+          </Button>
+        </Flex>
         
-        {/* Content Tabs */}
-        <Tabs variant="enclosed" mt={6} bg={tabBg} borderRadius="md" boxShadow="base">
-          <TabList>
-            <Tab>All Categories</Tab>
-            {config?.contentCategories.map(category => (
-              <Tab key={category} onClick={() => setSelectedCategory(category)}>
-                {category.charAt(0).toUpperCase() + category.slice(1)}
-              </Tab>
-            ))}
-          </TabList>
-
-          <TabPanels>
-            {/* All Categories Panel */}
-            <TabPanel>
-              {sortedStats.length > 0 ? (
-                <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
-                  {sortedStats.map((queue) => (
-                    <QueueCard
-                      key={queue.queueName}
-                      queue={queue}
-                      formatDuration={formatDuration}
-                      onReviewNext={(queueName) => {
-                        // Parse the queue name to extract category, algorithm, etc.
-                        // Example format: review:pdq:hate_speech:high
-                        const parts = queueName.split(':');
-                        const algorithm = parts[1] || '';
-                        const category = parts[2] || '';
-                        const confidenceLevel = parts[3] || '';
-                        const isEscalated = parts.length > 4 && parts[4] === 'escalated';
-                        
-                        // Build query params
-                        const params = new URLSearchParams();
-                        if (category) params.append('category', category);
-                        if (algorithm) params.append('algorithm', algorithm);
-                        if (confidenceLevel) params.append('confidence', confidenceLevel);
-                        if (isEscalated) params.append('escalated', 'true');
-                        
-                        // Navigate to review page
-                        window.location.href = `/review?${params.toString()}`;
-                        
-                        toast({
-                          title: 'Review Next Task',
-                          description: `Navigating to review page for queue: ${queueName}`,
-                          status: 'info',
-                          duration: 3000,
-                        });
-                      }}
-                    />
-                  ))}
-                </SimpleGrid>
+        {/* Queue Table */}
+        <Box 
+          borderWidth="1px" 
+          borderRadius="lg" 
+          overflow="hidden" 
+          bg="white" 
+          boxShadow="sm"
+        >
+          <Box as="table" width="100%" style={{ borderCollapse: 'collapse' }}>
+            <Box as="thead" bg="gray.50">
+              <Box as="tr">
+                <Box as="th" p={4} textAlign="left" fontWeight="semibold" width="5%"></Box>
+                <Box as="th" p={4} textAlign="left" fontWeight="semibold" width="25%">Name</Box>
+                <Box as="th" p={4} textAlign="left" fontWeight="semibold" width="30%">Description</Box>
+                <Box as="th" p={4} textAlign="left" fontWeight="semibold" width="10%">Pending Jobs</Box>
+                <Box as="th" p={4} textAlign="center" colSpan={3} width="30%">Actions</Box>
+              </Box>
+            </Box>
+            <Box as="tbody">
+              {loading ? (
+                <Box as="tr">
+                  <Box as="td" colSpan={6} p={8} textAlign="center">
+                    <Spinner size="lg" />
+                  </Box>
+                </Box>
+              ) : sortedStats.length > 0 ? (
+                sortedStats.map((queue) => (
+                  <Box as="tr" key={queue.queueName} borderTopWidth="1px" _hover={{ bg: "gray.50" }}>
+                    <Box as="td" p={4} textAlign="center">
+                      <Text fontSize="xl" color="yellow.400">☆</Text>
+                    </Box>
+                    <Box as="td" p={4}>
+                      <Text fontWeight="semibold">
+                        {queue.contentCategory.charAt(0).toUpperCase() + queue.contentCategory.slice(1)} - {queue.hashAlgorithm.toUpperCase()}
+                        {queue.isEscalated && " (Escalated)"}
+                      </Text>
+                    </Box>
+                    <Box as="td" p={4}>
+                      <Text>
+                        {queue.contentCategory.charAt(0).toUpperCase() + queue.contentCategory.slice(1)} content 
+                        {queue.isEscalated ? ' escalated' : ' flagged'} for review via {queue.hashAlgorithm.toUpperCase()} matching
+                      </Text>
+                    </Box>
+                    <Box as="td" p={4}>
+                      <Text fontWeight="semibold">{queue.pending}</Text>
+                    </Box>
+                    <Box as="td" p={3} textAlign="center">
+                      <Button 
+                        colorScheme="blue" 
+                        size="sm"
+                        onClick={() => {
+                          // Parse the queue name to extract category, algorithm, etc.
+                          const parts = queue.queueName.split(':');
+                          const algorithm = parts[1] || '';
+                          const category = parts[2] || '';
+                          
+                          // Build query params
+                          const params = new URLSearchParams();
+                          if (category) params.append('category', category);
+                          if (algorithm) params.append('algorithm', algorithm);
+                          if (queue.isEscalated) params.append('escalated', 'true');
+                          
+                          // Navigate to review page
+                          window.location.href = `/review?${params.toString()}`;
+                        }}
+                      >
+                        Start Reviewing
+                      </Button>
+                    </Box>
+                    <Box as="td" p={3} textAlign="center">
+                      <Button size="sm" variant="outline">Delete All Jobs</Button>
+                    </Box>
+                    <Box as="td" p={3} textAlign="center">
+                      <Button size="sm" variant="outline">Preview jobs</Button>
+                    </Box>
+                  </Box>
+                ))
               ) : (
-                <Center p={8}>
-                  <Text>No queues match the current filters.</Text>
-                </Center>
+                <Box as="tr">
+                  <Box as="td" colSpan={6} p={8} textAlign="center">
+                    <Text>No queues available with the current filters. Try changing your filters or refreshing.</Text>
+                  </Box>
+                </Box>
               )}
-            </TabPanel>
-            
-            {/* Category-specific Panels */}
-            {config?.contentCategories.map(category => (
-              <TabPanel key={category}>
-                {sortedStats.filter(q => q.contentCategory === category).length > 0 ? (
-                  <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
-                    {sortedStats
-                      .filter(q => q.contentCategory === category)
-                      .map((queue) => (
-                        <QueueCard
-                          key={queue.queueName}
-                          queue={queue}
-                          formatDuration={formatDuration}
-                          onReviewNext={(queueName) => {
-                            // Parse the queue name to extract category, algorithm, etc.
-                            // Example format: review:pdq:hate_speech:high
-                            const parts = queueName.split(':');
-                            const algorithm = parts[1] || '';
-                            const category = parts[2] || '';
-                            const confidenceLevel = parts[3] || '';
-                            const isEscalated = parts.length > 4 && parts[4] === 'escalated';
-                            
-                            // Build query params
-                            const params = new URLSearchParams();
-                            if (category) params.append('category', category);
-                            if (algorithm) params.append('algorithm', algorithm);
-                            if (confidenceLevel) params.append('confidence', confidenceLevel);
-                            if (isEscalated) params.append('escalated', 'true');
-                            
-                            // Navigate to review page
-                            window.location.href = `/review?${params.toString()}`;
-                            
-                            toast({
-                              title: 'Review Next Task',
-                              description: `Navigating to review page for queue: ${queueName}`,
-                              status: 'info',
-                              duration: 3000,
-                            });
-                          }}
-                        />
-                      ))
-                    }
-                  </SimpleGrid>
-                ) : (
-                  <Center p={8}>
-                    <Text>No queues in this category match the current filters.</Text>
-                  </Center>
-                )}
-              </TabPanel>
-            ))}
-          </TabPanels>
-        </Tabs>
+            </Box>
+          </Box>
+        </Box>
       </Box>
     </AppLayout>
   );

@@ -1,3 +1,5 @@
+'use client';
+
 import { Box, Flex, Heading, Button, HStack, useColorModeValue, useColorMode } from "@chakra-ui/react";
 import { MoonIcon, SunIcon } from "@chakra-ui/icons";
 import Link from "next/link";
@@ -21,17 +23,17 @@ export default function NavBar() {
       <Flex h={16} alignItems="center" justifyContent="space-between">
         <HStack spacing={8} alignItems="center">
           <Heading as="h1" size="md">
-            <Link href="/">HMA Review Tool</Link>
+            <Link href="/">Content Moderation Tool</Link>
           </Heading>
           <HStack as="nav" spacing={4} display={{ base: "none", md: "flex" }}>
             <Link href="/dashboard">
               <Button variant="ghost">Dashboard</Button>
             </Link>
-            <Link href="/review">
-              <Button variant="ghost">Review Queue</Button>
+            <Link href="/tasks">
+              <Button variant="ghost">Tasks</Button>
             </Link>
-            <Link href="/upload">
-              <Button variant="ghost">Upload</Button>
+            <Link href="/review">
+              <Button variant="ghost">Review</Button>
             </Link>
           </HStack>
         </HStack>
