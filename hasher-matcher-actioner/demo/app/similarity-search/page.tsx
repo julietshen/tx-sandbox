@@ -18,8 +18,15 @@ interface SimilarImage {
   hashes: Record<string, string>;
 }
 
+const getImageUrl = (filename: string) => {
+  // If it's a variation, it will be named like "variation_chicken1.jpg_1.jpg"
+  // If it's an original, it will be named like "chicken1.jpg"
+  return `http://localhost:8000/images/${filename}`;
+};
+
 export default function SimilaritySearch() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [hashValue, setHashValue] = useState<string>('');
   const [hashType, setHashType] = useState<HashingAlgorithm>(HashingAlgorithm.PDQ);
   const [threshold, setThreshold] = useState<number>(0.8);
@@ -29,8 +36,10 @@ export default function SimilaritySearch() {
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+      const file = e.target.files[0];
+      setSelectedFile(file);
       setHashValue(''); // Clear hash value when file is selected
+      setSelectedImageUrl(URL.createObjectURL(file));
     }
   };
 
@@ -43,6 +52,7 @@ export default function SimilaritySearch() {
       if (data.success && data.image) {
         setHashValue(data.image.hashes[hashType]);
         setSelectedFile(null);
+        setSelectedImageUrl(getImageUrl(data.image.filename));
       } else {
         throw new Error(data.error || 'Failed to get random image');
       }
@@ -229,6 +239,24 @@ export default function SimilaritySearch() {
         </div>
       </div>
 
+      {selectedImageUrl && (
+        <div className="row justify-content-center mb-5">
+          <div className="col-md-8">
+            <div className="card">
+              <div className="card-body">
+                <h5 className="card-title">Selected Image</h5>
+                <img 
+                  src={selectedImageUrl} 
+                  alt="Selected image" 
+                  className="img-fluid rounded mb-3"
+                  style={{ maxHeight: '300px', width: 'auto', display: 'block', margin: '0 auto' }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="alert alert-danger" role="alert">
           {error}
@@ -243,15 +271,16 @@ export default function SimilaritySearch() {
               {similarImages.map((image) => (
                 <div key={image.id} className="col">
                   <div className="card h-100">
+                    <img 
+                      src={getImageUrl(image.filename)} 
+                      alt={image.filename}
+                      className="card-img-top"
+                      style={{ height: '200px', objectFit: 'contain', backgroundColor: '#f8f9fa' }}
+                    />
                     <div className="card-body">
                       <h5 className="card-title">{image.filename}</h5>
                       <p className="card-text">
                         Distance: {image.distance.toFixed(4)}
-                      </p>
-                      <p className="card-text">
-                        <small className="text-muted">
-                          Uploaded: {new Date(image.upload_date).toLocaleString()}
-                        </small>
                       </p>
                     </div>
                   </div>

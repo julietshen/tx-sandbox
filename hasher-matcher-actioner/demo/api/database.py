@@ -49,10 +49,14 @@ class ImageDatabase:
                     upload_date TIMESTAMP,
                     file_hash TEXT UNIQUE,
                     pdq_hash TEXT,
+                    pdq_quality FLOAT,
                     md5_hash TEXT,
                     sha1_hash TEXT,
                     photodna_hash TEXT,
-                    netclean_hash TEXT
+                    netclean_hash TEXT,
+                    is_variation BOOLEAN DEFAULT FALSE,
+                    parent_image_id INTEGER,
+                    FOREIGN KEY (parent_image_id) REFERENCES images(id)
                 )
             """)
             
@@ -62,33 +66,40 @@ class ImageDatabase:
                     image1_id INTEGER,
                     image2_id INTEGER,
                     comparison_date TIMESTAMP,
-                    pdq_distance REAL,
-                    md5_distance REAL,
-                    sha1_distance REAL,
-                    photodna_distance REAL,
-                    netclean_distance REAL,
+                    pdq_distance INTEGER,
+                    md5_distance FLOAT,
+                    sha1_distance FLOAT,
+                    photodna_distance FLOAT,
+                    netclean_distance FLOAT,
                     FOREIGN KEY (image1_id) REFERENCES images(id),
                     FOREIGN KEY (image2_id) REFERENCES images(id)
                 )
             """)
 
-    def add_image(self, filename: str, file_hash: str, hashes: Dict[str, str]) -> int:
+    def add_image(self, filename: str, file_hash: str, hashes: Dict[str, str], quality_scores: Dict[str, float], is_variation: bool = False, parent_image_id: Optional[int] = None) -> int:
+        """Add an image to the database."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT OR IGNORE INTO images (
-                    filename, upload_date, file_hash, 
-                    pdq_hash, md5_hash, sha1_hash, photodna_hash, netclean_hash
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO images (
+                    filename, upload_date, file_hash,
+                    pdq_hash, pdq_quality,
+                    md5_hash, sha1_hash,
+                    photodna_hash, netclean_hash,
+                    is_variation, parent_image_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 filename,
                 datetime.datetime.now(),
                 file_hash,
                 hashes.get('pdq'),
+                quality_scores.get('pdq', 0.0),
                 hashes.get('md5'),
                 hashes.get('sha1'),
                 hashes.get('photodna'),
-                hashes.get('netclean')
+                hashes.get('netclean'),
+                is_variation,
+                parent_image_id
             ))
             return cursor.lastrowid
 
@@ -124,11 +135,14 @@ class ImageDatabase:
                     'file_hash': row[3],
                     'hashes': {
                         'pdq': row[4],
-                        'md5': row[5],
-                        'sha1': row[6],
-                        'photodna': row[7],
-                        'netclean': row[8]
-                    }
+                        'md5': row[6],
+                        'sha1': row[7],
+                        'photodna': row[8],
+                        'netclean': row[9]
+                    },
+                    'pdq_quality': row[5],
+                    'is_variation': row[10],
+                    'parent_image_id': row[11]
                 }
             return None
 
@@ -179,11 +193,14 @@ class ImageDatabase:
                     'file_hash': row[3],
                     'hashes': {
                         'pdq': row[4],
-                        'md5': row[5],
-                        'sha1': row[6],
-                        'photodna': row[7],
-                        'netclean': row[8]
-                    }
+                        'md5': row[6],
+                        'sha1': row[7],
+                        'photodna': row[8],
+                        'netclean': row[9]
+                    },
+                    'pdq_quality': row[5],
+                    'is_variation': row[10],
+                    'parent_image_id': row[11]
                 })
             
             return results

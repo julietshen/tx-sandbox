@@ -1,10 +1,11 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 import hashlib
 import io
 from PIL import Image
 from typing import Dict, List, Optional
-from .database import db
+from api.database import db
 import os
 import random
 from datetime import datetime
@@ -19,6 +20,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Directory containing test images
+TEST_IMAGES_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "test_images")
 
 def calculate_file_hash(file_contents: bytes) -> str:
     """Calculate a unique hash for the file contents."""
@@ -90,9 +94,12 @@ async def find_similar(
             # Calculate hash for the uploaded image using our test implementation
             from .generate_test_data import calculate_hash
             hash_value = calculate_hash(img)
+            print(f"Calculated hash for uploaded image: {hash_value}")
         
         if not hash_value:
             raise HTTPException(status_code=400, detail="Either image or hash_value must be provided")
+
+        print(f"Searching for similar images with hash_type={hash_type}, hash_value={hash_value}, threshold={threshold}")
 
         # Find similar images
         similar_images = db.find_similar_images(hash_type, hash_value, threshold)
@@ -103,8 +110,21 @@ async def find_similar(
                 # Calculate Hamming distance for PDQ hashes
                 target_hash = image['hashes']['pdq']
                 if target_hash and hash_value:
-                    distance = sum(1 for a, b in zip(hash_value, target_hash) if a != b) / len(hash_value)
-                    image['distance'] = distance
+                    print(f"\nComparing hashes for {image['filename']}:")
+                    print(f"Source hash:  {hash_value}")
+                    print(f"Target hash:  {target_hash}")
+                    
+                    # Convert hex strings to binary strings
+                    bin1 = ''.join(format(int(c, 16), '04b') for c in hash_value)
+                    bin2 = ''.join(format(int(c, 16), '04b') for c in target_hash)
+                    
+                    # Calculate raw Hamming distance (0-256 range for 256-bit hashes)
+                    distance = sum(1 for a, b in zip(bin1, bin2) if a != b)
+                    print(f"Raw Hamming distance: {distance}")
+                    
+                    # Store normalized distance for API compatibility (0-1 range)
+                    image['distance'] = distance / 256.0
+                    print(f"Normalized distance: {image['distance']}")
             elif hash_type in ["md5", "sha1"]:
                 # Binary comparison for cryptographic hashes
                 target_hash = image['hashes'][hash_type]
@@ -149,5 +169,31 @@ async def get_random_image():
             "success": False,
             "error": str(e)
         }
+
+@app.get("/images/{filename}")
+async def get_image(filename: str):
+    try:
+        # First try the test images directory
+        image_path = os.path.join(TEST_IMAGES_DIR, filename)
+        if not os.path.exists(image_path):
+            # If not found, try the variations directory
+            variations_dir = os.path.join(os.path.dirname(TEST_IMAGES_DIR), "variations")
+            os.makedirs(variations_dir, exist_ok=True)
+            image_path = os.path.join(variations_dir, filename)
+            if not os.path.exists(image_path):
+                raise HTTPException(status_code=404, detail=f"Image not found: {filename}")
+        
+        # Determine content type based on file extension
+        content_type = None
+        if filename.lower().endswith('.jpg') or filename.lower().endswith('.jpeg'):
+            content_type = 'image/jpeg'
+        elif filename.lower().endswith('.png'):
+            content_type = 'image/png'
+        else:
+            content_type = 'application/octet-stream'
+        
+        return FileResponse(image_path, media_type=content_type)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Add more endpoints as needed 
