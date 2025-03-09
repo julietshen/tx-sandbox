@@ -114,6 +114,17 @@ const Dashboard = () => {
     
     const mockStats: QueueStats[] = [];
     
+    // Distribute our 13 tasks across the 3 categories
+    // fowl_play: 5 tasks, wild_duckery: 5 tasks, rotten_eggs: 3 tasks
+    const categoryTaskCounts = {
+      'fowl_play': 5,
+      'wild_duckery': 5,
+      'rotten_eggs': 3
+    };
+    
+    // Check localStorage for dashboard stats to get completed task counts
+    const dashboardStats = JSON.parse(localStorage.getItem('dashboardStats') || '{}');
+    
     // Generate one queue per content category - each with a consistent hash algorithm
     mockCategories.forEach((category, index) => {
       // For each category, assign one consistent hash algorithm
@@ -122,8 +133,12 @@ const Dashboard = () => {
       // Get a fixed age value
       const oldestTaskAge = fixedTaskAges[index % fixedTaskAges.length];
       
-      // Generate higher pending count (25-75) to provide more tasks for the demo
-      const pending = Math.floor(Math.random() * 50) + 25;
+      // Get completed count for this category from localStorage, defaulting to 0
+      const completedCount = dashboardStats[category]?.completed || 0;
+      
+      // Calculate pending count by subtracting completed from total
+      const totalTasks = categoryTaskCounts[category];
+      const pendingCount = Math.max(0, totalTasks - completedCount);
       
       // Create only ONE queue per content category
       mockStats.push({
@@ -131,26 +146,30 @@ const Dashboard = () => {
         contentCategory: category,
         hashAlgorithm: hash,
         isEscalated: false,
-        pending: pending,
-        active: Math.floor(Math.random() * 5),
-        completed: Math.floor(Math.random() * 50) + 10,
+        pending: pendingCount,
+        active: Math.floor(Math.random() * 2), // Reduce to smaller value for realism
+        completed: completedCount,
         successRate: Math.random() * 100,
-        oldestTaskAge: oldestTaskAge
+        oldestTaskAge: pendingCount > 0 ? oldestTaskAge : 0 // If no pending tasks, set age to 0
       });
     });
     
     // If we're showing escalated content, add a single escalated queue
+    // Get escalated tasks from localStorage
+    const completedTasks = JSON.parse(localStorage.getItem('completedTasks') || '[]');
+    const escalatedTasks = completedTasks.filter(task => task.result === 'escalated');
+    
     if (showEscalated) {
       mockStats.push({
         queueName: 'review:escalated',
         contentCategory: 'escalated',
         hashAlgorithm: 'escalated',
         isEscalated: true,
-        pending: Math.floor(Math.random() * 15) + 10, // 10-25 escalated tasks
-        active: Math.floor(Math.random() * 2),
-        completed: Math.floor(Math.random() * 20) + 5,
-        successRate: Math.random() * 100,
-        oldestTaskAge: 7200 // 2 hours - escalated tasks tend to be older
+        pending: escalatedTasks.length, // Use actual count of escalated tasks
+        active: 0,
+        completed: 0,
+        successRate: 0,
+        oldestTaskAge: escalatedTasks.length > 0 ? 7200 : 0 // 2 hours if there are escalated tasks
       });
     }
     
@@ -182,8 +201,10 @@ const Dashboard = () => {
 
   // Function to reset all demo data
   const handleReset = () => {
-    // Clear any stored data
+    // Clear all stored task data
     localStorage.removeItem('reviewToolState');
+    localStorage.removeItem('completedTasks');
+    localStorage.removeItem('dashboardStats');
     
     toast({
       title: 'Demo Reset',
@@ -444,7 +465,6 @@ const Dashboard = () => {
                     borderTopWidth="1px" 
                     borderColor={useColorModeValue("gray.200", "gray.700")}
                     bg={useColorModeValue(index % 2 === 0 ? "white" : "gray.50", index % 2 === 0 ? "gray.800" : "gray.750")}
-                    _hover={{ bg: useColorModeValue("blue.50", "blue.900") }}
                   >
                     <Box as="td" p={4} textAlign="center">
                       <Text fontSize="xl" color="yellow.400">☆</Text>
@@ -481,27 +501,8 @@ const Dashboard = () => {
                         fontSize="lg" 
                         color={useColorModeValue("blue.600", "blue.300")}
                       >
-                        {/* Base pending count on the fixed duration we're displaying */}
-                        {(() => {
-                          const fixedDurations = [
-                            'None',
-                            '5m',
-                            '30m',
-                            '1h',
-                            '2h',
-                            '5h',
-                            '12h',
-                            '1d 0h',
-                            '1d 12h',
-                            '2d 0h',
-                            '2d 12h',
-                            '3d 0h'
-                          ];
-                          // If None, show 0 pending tasks, otherwise show a random count
-                          return fixedDurations[index % fixedDurations.length] === 'None' 
-                            ? 0 
-                            : (index % 25) + 1; // 1-25 pending tasks
-                        })()}
+                        {/* Display actual pending count from the queue */}
+                        {queue.pending}
                       </Text>
                     </Box>
                     <Box as="td" p={4}>

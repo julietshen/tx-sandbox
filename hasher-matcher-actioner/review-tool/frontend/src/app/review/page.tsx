@@ -97,29 +97,36 @@ export default function ReviewPage() {
   
   // Get mock task queue
   const getMockTaskQueue = useCallback(() => {
-    // Limit to unique content categories
-    const uniqueCategories = ['fowl_play', 'wild_duckery', 'rotten_eggs'];
+    // Content categories
+    const contentCategories = ['fowl_play', 'wild_duckery', 'rotten_eggs'];
     const algorithms = ['pdq', 'md5', 'sha256'];
     const confidenceLevels = ['low', 'medium', 'high'];
     
-    // Create one task for each unique category
-    return uniqueCategories.map((category, i) => ({
-      id: `mock-task-${i+1}`,
-      image_id: i+1,
-      content_category: category,
-      hash_algorithm: algorithms[i % algorithms.length],
-      confidence_level: confidenceLevels[i % confidenceLevels.length],
-      is_escalated: false, // All tasks start as not escalated
-      status: 'unreviewed', // All tasks start as unreviewed
-      created_at: new Date(Date.now() - i * 3600000).toISOString(), // Each task 1 hour apart
-      metadata: {
-        source: `Source ${i+1}`,
-        reporter: i % 2 === 0 ? 'User' : 'System',
-        report_reason: `Reason ${i+1}`
-      },
-      // Store PDQ hash for similarity matching
-      pdq_hash: `pdq_${i}_${Math.random().toString(36).substring(2, 8)}`
-    }));
+    // Create tasks for all 13 images, distributing across categories
+    const tasks = [];
+    for (let i = 0; i < 13; i++) {
+      const taskId = `mock-task-${i+1}`;
+      tasks.push({
+        id: taskId,
+        image_id: i+1,
+        // Distribute the tasks across different categories
+        content_category: contentCategories[i % contentCategories.length],
+        hash_algorithm: algorithms[i % algorithms.length],
+        confidence_level: confidenceLevels[i % confidenceLevels.length],
+        is_escalated: i > 10, // Make a couple tasks escalated
+        status: 'unreviewed', // All tasks start as unreviewed
+        created_at: new Date(Date.now() - i * 3600000).toISOString(), // Each task 1 hour apart
+        metadata: {
+          source: `Source ${i+1}`,
+          reporter: i % 2 === 0 ? 'User' : 'System',
+          report_reason: `Reason ${i+1}`
+        },
+        // Store PDQ hash for similarity matching
+        pdq_hash: `pdq_${i}_${Math.random().toString(36).substring(2, 8)}`
+      });
+    }
+    
+    return tasks;
   }, []);
   
   // Calculate PDQ hash distance (mock implementation)
@@ -140,7 +147,8 @@ export default function ReviewPage() {
   // Get mock image for a task
   const getMockImage = useCallback((taskId: string) => {
     const id = parseInt(taskId.split('-').pop() || '1');
-    const imageIndex = ((id - 1) % 5) + 8; // Use photo8.jpg through photo12.jpg
+    // Use all 13 images (photo1.jpg through photo13.jpg)
+    const imageIndex = ((id - 1) % 13) + 1;
     
     // Find the task to match its creation date
     const task = taskQueue.find(t => t.id === taskId);
@@ -178,22 +186,29 @@ export default function ReviewPage() {
   // Get mock matches for a task
   const getMockMatches = useCallback((taskId: string) => {
     const id = parseInt(taskId.split('-').pop() || '1');
-    return [
-      {
-        match_id: `m${id}`,
-        hash_algorithm: 'pdq',
-        match_hash: `pdq_${id-1}_${Math.random().toString(36).substring(2, 8)}`,
-        distance: 5,
-        reference_id: `ref${id}`,
-        reference_source: 'internal database',
-        reference_type: 'known_content',
+    const matches = [];
+    
+    // Generate between 1-3 matches for each task
+    const matchCount = Math.min(3, Math.max(1, id % 4));
+    
+    for (let i = 0; i < matchCount; i++) {
+      matches.push({
+        match_id: `m${id}-${i+1}`,
+        hash_algorithm: i === 0 ? 'pdq' : i === 1 ? 'md5' : 'sha256',
+        match_hash: `hash_${id}_${i}_${Math.random().toString(36).substring(2, 8)}`,
+        distance: 5 + i * 3, // Increasing distance for each match
+        reference_id: `ref${id}-${i+1}`,
+        reference_source: i === 0 ? 'internal database' : i === 1 ? 'partner database' : 'external watchlist',
+        reference_type: i === 0 ? 'known_content' : i === 1 ? 'similar_content' : 'reported_content',
         reference_metadata: {
           category: id % 3 === 0 ? 'hate_speech' : id % 2 === 0 ? 'misinformation' : 'harmful_content',
-          severity: id % 2 === 0 ? 'high' : 'medium',
-          added_date: new Date().toISOString()
+          severity: i === 0 ? 'high' : i === 1 ? 'medium' : 'low',
+          added_date: new Date(Date.now() - i * 86400000).toISOString() // Each match added a day apart
         }
-      }
-    ];
+      });
+    }
+    
+    return matches;
   }, []);
   
   // Find similar images using PDQ
@@ -203,40 +218,47 @@ export default function ReviewPage() {
     
     // Get current task's PDQ hash
     const currentPDQHash = curTask.pdq_hash;
+    const currentCat = curTask.content_category;
     
     // Find other tasks with similar PDQ hashes
-    // Sort by similarity (PDQ distance)
-    const similarTasks = allTasks
-      .filter(task => task.id !== currentTaskId) // Exclude current task
+    // First get tasks in the same category (higher priority)
+    const sameCategoryTasks = allTasks
+      .filter(task => task.id !== currentTaskId && task.content_category === currentCat)
       .map(task => ({
         task,
         distance: calculatePDQDistance(currentPDQHash, task.pdq_hash)
       }))
-      .sort((a, b) => a.distance - b.distance) // Sort by distance (ascending)
+      .sort((a, b) => a.distance - b.distance); // Sort by distance (ascending)
+    
+    // Then get other tasks that might be similar
+    const otherCategoryTasks = allTasks
+      .filter(task => task.id !== currentTaskId && task.content_category !== currentCat)
+      .map(task => ({
+        task,
+        distance: calculatePDQDistance(currentPDQHash, task.pdq_hash)
+      }))
+      .sort((a, b) => a.distance - b.distance); // Sort by distance (ascending)
+    
+    // Combine lists, prioritizing same category but ensuring diversity
+    const similarTasks = [...sameCategoryTasks.slice(0, 2), ...otherCategoryTasks.slice(0, 2)]
+      .sort((a, b) => a.distance - b.distance) // Re-sort by distance
       .slice(0, 3); // Take top 3 most similar
       
     // Convert to Image objects with task_id for navigation
     return similarTasks.map(({ task }) => {
       const taskId = parseInt(task.id.split('-').pop() || '1');
-      const imageIndex = ((taskId - 1) % 5) + 8;
+      // Use all 13 images (photo1.jpg through photo13.jpg)
+      const imageIndex = ((taskId - 1) % 13) + 1;
       
       return {
         id: taskId,
         filename: `similar_${taskId}.jpg`,
-        upload_date: new Date().toISOString(),
-        url: `/test_images/photo${imageIndex}.jpg`,
-        size: 9000 + taskId * 500,
+        upload_date: new Date(Date.now() - taskId * 3600000).toISOString(),
+        url: `/test_images/photo${imageIndex}.jpg`, // Use all available images
+        size: 8000 + taskId * 1000,
         width: 800,
         height: 600,
         mime_type: 'image/jpeg',
-        hashes: [
-          {
-            algorithm: 'pdq',
-            hash: task.pdq_hash,
-            quality: 80 + taskId
-          }
-        ],
-        // Store the task ID for navigation
         task_id: task.id,
         // Store the PDQ distance for display
         pdq_distance: calculatePDQDistance(currentPDQHash, task.pdq_hash)
@@ -245,7 +267,7 @@ export default function ReviewPage() {
   }, [calculatePDQDistance]);
   
   // Use mock data for development - moved up to break circular dependency
-  const useMockData = useCallback(() => {
+  const loadMockData = useCallback(() => {
     // Load mock task queue if not already loaded
     if (taskQueue.length === 0) {
       const mockQueue = getMockTaskQueue();
@@ -399,6 +421,36 @@ export default function ReviewPage() {
       const mockQueue = getMockTaskQueue();
       setTaskQueue(mockQueue);
       setRemainingCount(mockQueue.length);
+      
+      // Initialize dashboard stats if needed
+      // Count tasks per category
+      const categoryCounts = {};
+      mockQueue.forEach(task => {
+        const category = task.content_category;
+        if (!categoryCounts[category]) {
+          categoryCounts[category] = 0;
+        }
+        categoryCounts[category]++;
+      });
+      
+      // Initialize dashboard stats if not already present
+      const dashboardStats = JSON.parse(localStorage.getItem('dashboardStats') || '{}');
+      let needsUpdate = false;
+      
+      // For each category, make sure the initial pending count is set
+      Object.keys(categoryCounts).forEach(category => {
+        if (!dashboardStats[category]) {
+          dashboardStats[category] = {
+            pending: categoryCounts[category],
+            completed: 0
+          };
+          needsUpdate = true;
+        }
+      });
+      
+      if (needsUpdate) {
+        localStorage.setItem('dashboardStats', JSON.stringify(dashboardStats));
+      }
     };
     
     initializeQueue();
@@ -455,6 +507,25 @@ export default function ReviewPage() {
           result: result,
           notes: notes
         };
+        
+        // Store completed task data in localStorage to track across pages
+        const completedTasks = JSON.parse(localStorage.getItem('completedTasks') || '[]');
+        completedTasks.push({
+          id: currentTask.id,
+          category: currentTask.content_category,
+          result: result,
+          timestamp: new Date().toISOString()
+        });
+        localStorage.setItem('completedTasks', JSON.stringify(completedTasks));
+        
+        // Update dashboard stats in localStorage to reflect the removed pending task
+        const dashboardStats = JSON.parse(localStorage.getItem('dashboardStats') || '{}');
+        if (!dashboardStats[currentTask.content_category]) {
+          dashboardStats[currentTask.content_category] = { completed: 0, pending: 0 };
+        }
+        dashboardStats[currentTask.content_category].completed = (dashboardStats[currentTask.content_category].completed || 0) + 1;
+        dashboardStats[currentTask.content_category].pending = Math.max(0, (dashboardStats[currentTask.content_category].pending || 0) - 1);
+        localStorage.setItem('dashboardStats', JSON.stringify(dashboardStats));
         
         // Determine next task index
         const nextIndex = currentQueueIndex < taskQueue.length - 1 ? currentQueueIndex + 1 : -1;
