@@ -126,38 +126,6 @@ const ImageCard: React.FC<ImageCardProps> = ({
           bg="gray.100"
         />
       </Box>
-
-      <Flex justify="space-between" wrap="wrap">
-        <Box flex="1" mr={4}>
-          <Text fontWeight="bold">Filename:</Text>
-          <Text>{filename}</Text>
-        </Box>
-        <Box>
-          <Text fontWeight="bold">Upload Date:</Text>
-          <Text>{formatDate(upload_date)}</Text>
-        </Box>
-      </Flex>
-
-      <Box>
-        <Text fontWeight="bold" mb={2}>Hash Information:</Text>
-        <Flex gap={2} wrap="wrap">
-          {hashes.map((hash, index) => (
-            <Badge
-              key={index}
-              colorScheme={
-                selectedAlgorithm && hash.algorithm === selectedAlgorithm
-                  ? 'green'
-                  : getHashBadgeColor(hash.algorithm)
-              }
-              p={2}
-              borderRadius="md"
-            >
-              {hash.algorithm.toUpperCase()}: {formatHash(hash.hash)}
-              {hash.quality !== undefined && ` (Quality: ${hash.quality})`}
-            </Badge>
-          ))}
-        </Flex>
-      </Box>
     </VStack>
   );
 };

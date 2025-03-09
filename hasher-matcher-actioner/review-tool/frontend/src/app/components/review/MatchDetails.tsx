@@ -38,6 +38,14 @@ export default function MatchDetails({ matches }: MatchDetailsProps) {
     return new Date(dateString).toLocaleString();
   };
 
+  // Format category names for display
+  const formatCategory = (category: string) => {
+    if (!category) return 'Unknown';
+    return category.split('_').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+  };
+
   if (matches.length === 0) {
     return (
       <Box p={4} borderRadius="md" bg={bgColor}>
@@ -73,9 +81,15 @@ export default function MatchDetails({ matches }: MatchDetailsProps) {
                     {match.hash_algorithm.toUpperCase()}
                   </Badge>
                 </HStack>
-                <Text fontSize="sm" color="gray.500">
-                  Match ID: {match.match_id || 'Unknown'}
-                </Text>
+                <Tooltip 
+                  label="Unique identifier for this match event. Used for audit trails and content tracking."
+                  placement="top"
+                  hasArrow
+                >
+                  <Text fontSize="sm" color="gray.500" cursor="help">
+                    Match Tracking ID: {match.match_id || 'Unknown'}
+                  </Text>
+                </Tooltip>
               </HStack>
               
               <Divider />
@@ -88,7 +102,16 @@ export default function MatchDetails({ matches }: MatchDetailsProps) {
                   </Tr>
                   <Tr>
                     <Td fontWeight="bold">Reference ID</Td>
-                    <Td>{match.reference_id || 'Unknown'}</Td>
+                    <Td>
+                      {match.reference_id || 'Unknown'}
+                      <Tooltip 
+                        label="Identifier for the reference content in the database that matched with this content. Used for linking to original source material."
+                        placement="top"
+                        hasArrow
+                      >
+                        <span><Icon as={InfoIcon} ml={1} boxSize={3} color="gray.500" /></span>
+                      </Tooltip>
+                    </Td>
                   </Tr>
                   <Tr>
                     <Td fontWeight="bold">Match Distance</Td>
@@ -102,7 +125,7 @@ export default function MatchDetails({ matches }: MatchDetailsProps) {
                   {metadata.category && (
                     <Tr>
                       <Td fontWeight="bold">Category</Td>
-                      <Td>{metadata.category}</Td>
+                      <Td>{formatCategory(metadata.category)}</Td>
                     </Tr>
                   )}
                   {metadata.severity && (

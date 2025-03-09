@@ -193,15 +193,15 @@ export default function ReviewPage() {
     
     for (let i = 0; i < matchCount; i++) {
       matches.push({
-        match_id: `m${id}-${i+1}`,
+        match_id: `Match-${id}-${i+1}`,
         hash_algorithm: i === 0 ? 'pdq' : i === 1 ? 'md5' : 'sha256',
         match_hash: `hash_${id}_${i}_${Math.random().toString(36).substring(2, 8)}`,
         distance: 5 + i * 3, // Increasing distance for each match
-        reference_id: `ref${id}-${i+1}`,
+        reference_id: `DB-Ref-${id}-${i+1}`,
         reference_source: i === 0 ? 'internal database' : i === 1 ? 'partner database' : 'external watchlist',
         reference_type: i === 0 ? 'known_content' : i === 1 ? 'similar_content' : 'reported_content',
         reference_metadata: {
-          category: id % 3 === 0 ? 'hate_speech' : id % 2 === 0 ? 'misinformation' : 'harmful_content',
+          category: id % 3 === 0 ? 'fowl_play' : id % 2 === 0 ? 'wild_duckery' : 'rotten_eggs',
           severity: i === 0 ? 'high' : i === 1 ? 'medium' : 'low',
           added_date: new Date(Date.now() - i * 86400000).toISOString() // Each match added a day apart
         }
