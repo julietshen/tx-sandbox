@@ -25,9 +25,11 @@
   - Match details
   - Dashboard with filter drawer
   - Tasks page with mock data
+  - Reusable UI components (OldestTaskDisplay, PendingCountDisplay)
 - Main landing page now redirects directly to the Dashboard
 - Using local test images from `/public/test_images/` for development
 - Mock data implemented for all components to allow testing without API dependencies
+- Comprehensive unit tests added for utilities, hooks, and UI components
 
 ## Recent Updates
 
@@ -59,6 +61,46 @@
 - Implemented `useMockData` function in review page
 - Created `getMockTasks` function for the tasks page
 - Added toast notifications when using mock data
+
+### 5. Code Architecture Improvements
+- Created utility modules for formatting and mock data
+- Implemented custom hooks (useFilterState, useReviewState) for state management
+- Developed reusable UI components for task durations and pending counts
+- Updated API service with centralized mock data toggling
+- Added comprehensive unit tests for all new components and utilities
+
+### 6. Content Categories Update
+- Changed content categories to use humorous alternatives:
+  - "fowl_play" (suspicious chicken-related activities)
+  - "wild_duckery" (questionable duck behavior)
+  - "rotten_eggs" (egg-related offenses)
+- Eliminated duplicate category queues
+- Updated color schemes and descriptions for the new categories
+- Made these changes to clearly indicate this is a demo application
+
+### 7. UI Improvements
+- Removed filter components from the review page
+- Kept filtering functionality exclusive to the dashboard
+- Simplified the review page UI to focus on content evaluation
+- Fixed a positioning issue with the 'use client' directive in Tasks page
+
+### 8. Review Tool Demo Enhancements (March 2024)
+- Added task state management with three key states:
+  - pending (unreviewed tasks)
+  - reviewed (tasks with approve/reject/escalate action)
+  - escalated (tasks requiring special handling)
+- Fixed queue display to ensure only ONE queue per content category
+- Modified content category descriptions:
+  - Removed "humor" reference from fowl_play category
+  - Updated rotten_eggs description to remove breakfast references
+- Added a Reset Demo button (green) for clearing all task states 
+- Fixed button spacing with proper ButtonGroup component
+- Increased task counts (25-75 tasks per category) for substantial demos
+- Improved UI with consistent button styling:
+  - Filter button now has purple filled style
+  - Removed unnecessary Create Queue button
+- Set image publish dates to align with task ages
+- Made similar content section open task details in new tab
 
 ## Issues Encountered
 
@@ -152,6 +194,19 @@
 - Implemented direct paths to local test images in the public folder
 - Added proper handling for URLs that start with "/" to avoid API calls
 
+### 6. 'use client' Directive Placement Issues
+
+#### Problem:
+- Encountered an error with the Tasks page:
+  ```
+  The "use client" directive must be placed before other expressions.
+  ```
+
+#### Solution:
+- Moved the 'use client' directive to the very top of the file, before any other code
+- Ensured that all client components have the directive properly positioned
+- Added validation checks to prevent similar issues in other components
+
 ## User Feedback & Requirements
 
 1. The user expressed a preference for using Chakra UI for the HMA Review Tool UI framework
@@ -171,12 +226,17 @@
    - Easily accessible "Start Reviewing" buttons
    - Clean, accessible design with proper contrast
 
+7. The user requested that the content categories be updated to clearly indicate this is a demo app:
+   - Changed to humorous bird-themed categories 
+   - Requested that filter UI only appear on the dashboard, not on the review page
+
 ## Next Steps
 
 ### Frontend
 1. Continue refining UI based on user feedback
 2. Implement additional features for the review process
 3. Prepare for API integration when backend is ready
+4. Run and fix any failing unit tests
 
 ### Backend
 1. Ensure all API endpoints are functioning properly
@@ -184,9 +244,10 @@
 3. Verify the queue system's functionality
 
 ### Testing
-1. Test the complete flow from the dashboard to the review page
-2. Verify PDQ hash computation and matching functionality
-3. Test the review actions (approve, reject, escalate, skip)
+1. Continue building out the test suite for full coverage
+2. Test the complete flow from the dashboard to the review page
+3. Verify PDQ hash computation and matching functionality
+4. Test the review actions (approve, reject, escalate, skip)
 
 ## Environment Information
 - OS: macOS Darwin 24.3.0
@@ -219,6 +280,16 @@
    - **Solution**: Standardized mock data functions across components and added proper typing
    - **Lesson**: Create consistent mock data utilities early in the development process
 
+5. **Client/Server Component Confusion**
+   - **Problem**: Encountered issues with 'use client' directive placement and client-side operations in server components
+   - **Solution**: Created clear separation and proper directive placement in all components
+   - **Lesson**: Understand Next.js's App Router architecture and client/server boundaries before starting development
+
+6. **Test-Driven Component Development**
+   - **Problem**: Initial components lacked test coverage and had implicit assumptions about behavior
+   - **Solution**: Implemented comprehensive tests for utilities, hooks, and components
+   - **Lesson**: Writing tests helps clarify component behavior and requirements, reducing bugs and refactoring complexity
+
 ### Development Strategies for Future Projects
 
 1. **Frontend Development Without Backend Dependencies**
@@ -233,7 +304,7 @@
    - Show active filters visually to improve user understanding of current view
 
 3. **Next.js App Router Best Practices**
-   - Keep client-side functionality clearly separated with 'use client' directives
+   - Keep client-side functionality clearly separated with 'use client' directives at the top of files
    - Consider server-side vs. client-side rendering implications early in component design
    - Use layout components strategically to avoid duplicate code
    - Implement page transitions and loading states for better user experience
@@ -242,5 +313,11 @@
    - Frequent feedback cycles with visual references helped align expectations
    - Small, focused commits with descriptive messages improved project tracking
    - Maintaining detailed project notes facilitated knowledge sharing
+
+5. **Testing Best Practices**
+   - Write tests for normal cases, edge cases, and invalid inputs
+   - Mock dependencies to isolate components under test
+   - Test hooks with `renderHook` and UI components with `render` from testing-library
+   - Use test-driven development for critical functionality
 
 These insights will be valuable for future development work on this and other projects. 
