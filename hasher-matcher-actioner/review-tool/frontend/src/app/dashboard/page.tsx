@@ -33,7 +33,10 @@ import {
   FormLabel,
   Switch,
   VStack,
+  Icon,
+  ButtonGroup,
 } from '@chakra-ui/react';
+import { RepeatIcon } from '@chakra-ui/icons';
 import AppLayout from '../components/layout/AppLayout';
 import { QueueCard } from '../components/dashboard/QueueCard';
 import { FilterBar } from '../components/dashboard/FilterBar';
@@ -99,56 +102,57 @@ const Dashboard = () => {
   // Function to use mock data for development/demo
   const useMockData = () => {
     const mockCategories = ['fowl_play', 'wild_duckery', 'rotten_eggs'];
-    const mockHashTypes = ['pdq', 'md5', 'sha1', 'escalated', 'manual'];
+    const mockHashTypes = ['pdq', 'md5', 'sha1'];
     const mockConfidenceLevels = ['high', 'medium', 'low'];
     
     // Simple fixed values for task ages (in seconds)
     const fixedTaskAges = [
-      0,           // No tasks
       300,         // 5 minutes
       1800,        // 30 minutes
       3600,        // 1 hour
-      7200,        // 2 hours
-      18000,       // 5 hours
-      43200,       // 12 hours
-      86400,       // 1 day
-      129600,      // 1.5 days
-      172800,      // 2 days
-      259200       // 3 days
     ];
     
     const mockStats: QueueStats[] = [];
     
-    let ageIndex = 0;
-    
-    // Generate mock data for each category and hash type
-    mockCategories.forEach(category => {
-      mockHashTypes.forEach(hash => {
-        // Skip escalated for normal queues
-        if (hash === 'escalated' && !showEscalated) return;
-        
-        const isEsc = hash === 'escalated';
-        
-        // Get a fixed age value and increment the index
-        const oldestTaskAge = fixedTaskAges[ageIndex % fixedTaskAges.length];
-        ageIndex++;
-        
-        // If age is 0, set pending to 0 as well
-        const pending = oldestTaskAge === 0 ? 0 : Math.floor(Math.random() * 50) + 1;
-        
-        mockStats.push({
-          queueName: `review:${hash}:${category}${isEsc ? '_escalated' : ''}`,
-          contentCategory: category,
-          hashAlgorithm: hash,
-          isEscalated: isEsc,
-          pending: pending,
-          active: Math.floor(Math.random() * 10),
-          completed: Math.floor(Math.random() * 100) + 50,
-          successRate: Math.random() * 100,
-          oldestTaskAge: oldestTaskAge
-        });
+    // Generate one queue per content category - each with a consistent hash algorithm
+    mockCategories.forEach((category, index) => {
+      // For each category, assign one consistent hash algorithm
+      const hash = mockHashTypes[index % mockHashTypes.length];
+      
+      // Get a fixed age value
+      const oldestTaskAge = fixedTaskAges[index % fixedTaskAges.length];
+      
+      // Generate higher pending count (25-75) to provide more tasks for the demo
+      const pending = Math.floor(Math.random() * 50) + 25;
+      
+      // Create only ONE queue per content category
+      mockStats.push({
+        queueName: `review:${category}`,
+        contentCategory: category,
+        hashAlgorithm: hash,
+        isEscalated: false,
+        pending: pending,
+        active: Math.floor(Math.random() * 5),
+        completed: Math.floor(Math.random() * 50) + 10,
+        successRate: Math.random() * 100,
+        oldestTaskAge: oldestTaskAge
       });
     });
+    
+    // If we're showing escalated content, add a single escalated queue
+    if (showEscalated) {
+      mockStats.push({
+        queueName: 'review:escalated',
+        contentCategory: 'escalated',
+        hashAlgorithm: 'escalated',
+        isEscalated: true,
+        pending: Math.floor(Math.random() * 15) + 10, // 10-25 escalated tasks
+        active: Math.floor(Math.random() * 2),
+        completed: Math.floor(Math.random() * 20) + 5,
+        successRate: Math.random() * 100,
+        oldestTaskAge: 7200 // 2 hours - escalated tasks tend to be older
+      });
+    }
     
     setStats(mockStats);
     setConfig({
@@ -176,16 +180,46 @@ const Dashboard = () => {
     fetchDashboardData();
   };
 
+  // Function to reset all demo data
+  const handleReset = () => {
+    // Clear any stored data
+    localStorage.removeItem('reviewToolState');
+    
+    toast({
+      title: 'Demo Reset',
+      description: 'All task states have been reset for a fresh demo.',
+      status: 'success',
+      duration: 3000,
+      isClosable: true,
+    });
+    
+    // Reload with fresh mock data
+    useMockData();
+  };
+
   // Filter and sort the stats
   const filteredStats = stats.filter(queue => {
+    // Use a more aggressive filter to ensure uniqueness by content category
     if (selectedCategory && queue.contentCategory !== selectedCategory) return false;
     if (selectedHashAlgorithm && queue.hashAlgorithm !== selectedHashAlgorithm) return false;
     if (showEscalated !== queue.isEscalated) return false;
     return true;
   });
 
+  // Process filtered stats to ensure only one per category
+  const uniqueStats: QueueStats[] = [];
+  const processedCategories = new Set<string>();
+  
+  filteredStats.forEach(queue => {
+    // If we haven't seen this category yet, add it
+    if (!processedCategories.has(queue.contentCategory)) {
+      uniqueStats.push(queue);
+      processedCategories.add(queue.contentCategory);
+    }
+  });
+
   // Sort the filtered stats
-  const sortedStats = [...filteredStats].sort((a, b) => {
+  const sortedStats = [...uniqueStats].sort((a, b) => {
     switch (sortBy) {
       case 'oldest':
         return b.oldestTaskAge - a.oldestTaskAge;
@@ -259,13 +293,16 @@ const Dashboard = () => {
   const getCategoryDescription = (category: string) => {
     switch (category.toLowerCase()) {
       case 'fowl_play':
-        return 'Content that contains suspicious chicken-related activities or bird-themed humor';
+        return 'Content that contains suspicious chicken-related activities or inappropriate poultry content';
       
       case 'wild_duckery':
         return 'Content with excessive waterfowl antics or questionable duck behavior';
       
       case 'rotten_eggs':
-        return 'Content featuring spoiled breakfast ingredients or egg-related offenses';
+        return 'Content featuring spoiled or harmful egg-related offenses';
+      
+      case 'escalated':
+        return 'Content that requires additional review by senior moderators';
       
       default:
         return 'Content that violates our policies';
@@ -296,15 +333,6 @@ const Dashboard = () => {
               Moderation queues allow you to manually review content and users one at a time
             </Text>
           </Box>
-          <Button 
-            colorScheme="blue" 
-            size="md"
-            borderRadius="md"
-            fontWeight="bold"
-            px={6}
-          >
-            Create Queue
-          </Button>
         </Flex>
         
         {error && (
@@ -355,28 +383,30 @@ const Dashboard = () => {
               </Button>
             )}
           </HStack>
-          <Flex>
-            <Button 
-              leftIcon={<span>🔄</span>}
-              colorScheme="blue" 
-              variant="outline"
-              size="md"
-              mr={3}
-              onClick={handleRefresh} 
-              isLoading={loading}
+          
+          {/* Button Group - Fix spacing issues */}
+          <ButtonGroup spacing={3} ml={2}>
+            <Button
+              colorScheme="blue"
+              leftIcon={<RepeatIcon />}
+              onClick={handleRefresh}
             >
               Refresh
             </Button>
             <Button
+              colorScheme="green"
+              onClick={handleReset}
+            >
+              Reset Demo
+            </Button>
+            <Button
+              colorScheme="purple"
               leftIcon={<span>🔍</span>}
-              colorScheme="gray"
-              variant="outline"
-              size="md"
               onClick={() => setIsFilterOpen(true)}
             >
               Filter
             </Button>
-          </Flex>
+          </ButtonGroup>
         </Flex>
         
         {/* Queue Table */}
