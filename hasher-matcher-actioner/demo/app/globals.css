@@ -1,0 +1,284 @@
+/* Font declarations */
+@font-face {
+  font-family: 'Funnel Display';
+  src: url('/fonts/FunnelDisplay-VariableFont_wght.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Funnel Sans';
+  src: url('/fonts/FunnelSans-VariableFont_wght.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Funnel Sans';
+  src: url('/fonts/FunnelSans-Italic-VariableFont_wght.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+:root {
+  /* Colors from style guide */
+  --color-white: #ffffff;
+  --color-light-grey: #bdc2bf;
+  --color-charcoal: #25291c;
+  --color-yellow: #efef45;
+  --color-peach: #efbe89;
+  
+  /* Material Design colors for accessibility */
+  --color-primary: #1a237e;  /* Dark blue */
+  --color-primary-light: #534bae;
+  --color-primary-dark: #000051;
+  --color-surface: #ffffff;
+  --color-background: #f5f5f5;
+  --color-error: #c62828;
+  --color-success: #2e7d32;
+  --color-text-primary: #212121;
+  --color-text-secondary: #757575;
+  --color-warning: #f57c00;  /* New warning color for different images */
+  --color-info: #0288d1;     /* New info color for licensing messages */
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+/* Using system sans-serif fonts temporarily */
+body {
+  font-family: 'Funnel Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+  color: var(--color-charcoal);
+  background-color: var(--color-white);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Funnel Display', Georgia, serif;
+  font-weight: 700;
+  color: var(--color-charcoal);
+  margin-bottom: 1rem;
+}
+
+.subhead {
+  font-family: 'Funnel Sans', sans-serif;
+  font-weight: 300;
+  color: var(--color-charcoal);
+}
+
+/* Card Styles */
+.card {
+  border-radius: 8px;
+  border: 1px solid var(--color-light-grey);
+  box-shadow: 0 2px 4px rgba(37, 41, 28, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: var(--color-white);
+  margin-bottom: 1.5rem;
+}
+
+.card:hover {
+  box-shadow: 0 4px 8px rgba(37, 41, 28, 0.15);
+  transform: translateY(-2px);
+}
+
+.card-header {
+  background-color: var(--color-yellow);
+  border-bottom: 1px solid var(--color-light-grey);
+  padding: 1.5rem;
+}
+
+.card-body {
+  padding: 1.5rem;
+}
+
+/* Alert Styles */
+.alert {
+  border-radius: 4px;
+  border: none;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 4px rgba(37, 41, 28, 0.1);
+}
+
+.alert.alert-info {
+  background-color: var(--color-light-grey) !important;
+  color: var(--color-charcoal);
+  border: 1px solid var(--color-charcoal);
+}
+
+.alert.alert-peach {
+  background-color: var(--color-peach) !important;
+  color: var(--color-charcoal);
+  border: 1px solid var(--color-charcoal);
+}
+
+.alert.alert-warning {
+  background-color: var(--color-yellow) !important;
+  color: var(--color-charcoal);
+  border: 1px solid var(--color-charcoal);
+}
+
+.alert.alert-danger {
+  background-color: var(--color-light-grey) !important;
+  color: var(--color-charcoal);
+  border: 1px solid var(--color-charcoal);
+}
+
+/* Badge Styles */
+.badge {
+  font-family: 'Funnel Sans', sans-serif;
+  font-weight: 500;
+  padding: 0.5em 1em;
+  border-radius: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.badge.bg-primary {
+  background-color: var(--color-yellow) !important;
+  color: var(--color-charcoal);
+}
+
+.badge.bg-success {
+  background-color: var(--color-peach) !important;
+  color: var(--color-charcoal);
+}
+
+/* Form Controls */
+.form-control {
+  border-radius: 4px;
+  border: 1px solid var(--color-light-grey);
+  padding: 0.75rem 1rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 400;
+  font-size: 1rem;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  background-color: var(--color-white);
+  color: var(--color-charcoal);
+}
+
+.form-control:focus {
+  border-color: var(--color-yellow);
+  box-shadow: 0 0 0 2px rgba(239, 239, 69, 0.2);
+  outline: none;
+}
+
+.form-control:hover {
+  border-color: var(--color-charcoal);
+}
+
+/* Accessibility Improvements */
+.form-label {
+  color: var(--color-charcoal);
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.btn {
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-primary {
+  background-color: var(--color-charcoal);
+  border-color: var(--color-charcoal);
+  color: var(--color-white);
+}
+
+.btn-primary:hover {
+  background-color: var(--color-charcoal);
+  border-color: var(--color-charcoal);
+  opacity: 0.9;
+}
+
+.spinner-border {
+  color: var(--color-charcoal);
+}
+
+.text-muted {
+  color: var(--color-charcoal) !important;
+  opacity: 0.7;
+}
+
+img {
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(37, 41, 28, 0.1);
+}
+
+/* Navigation */
+.navbar {
+  padding: 1rem 0;
+  background-color: var(--color-charcoal);
+  box-shadow: 0 2px 4px rgba(37, 41, 28, 0.1);
+}
+
+.navbar-brand {
+  font-family: 'Funnel Display', serif;
+  font-weight: bold;
+  font-size: 1.5rem;
+  color: var(--color-white);
+}
+
+.navbar-text {
+  color: var(--color-white);
+  opacity: 0.9;
+}
+
+.container-fluid {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+/* Accessibility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+/* Focus styles for keyboard navigation */
+:focus {
+  outline: 2px solid var(--color-yellow);
+  outline-offset: 2px;
+}
+
+/* Skip to main content link for keyboard users */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--color-charcoal);
+  color: var(--color-white);
+  padding: 8px;
+  z-index: 100;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+/* Card header with yellow background */
+.card .card-header {
+  background-color: var(--color-yellow) !important;
+  border-bottom: 1px solid var(--color-charcoal);
+  padding: 1rem;
+} 

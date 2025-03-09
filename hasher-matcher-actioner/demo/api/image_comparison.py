@@ -51,7 +51,11 @@ def check_algorithm_availability(algorithm: HashingAlgorithm) -> tuple[bool, str
         return True, ""
     return True, ""
 
-app = FastAPI()
+app = FastAPI(
+    title="Image Comparison API",
+    description="API for comparing images using various hashing algorithms",
+    version="1.0.0"
+)
 db = Database()
 
 # Configure CORS
@@ -117,8 +121,10 @@ def calculate_hash_distance(hash1: str, hash2: str, algorithm: HashingAlgorithm)
             
             bin1 = hex_to_bin(hash1)
             bin2 = hex_to_bin(hash2)
-            # Count differing bits
-            return float(sum(b1 != b2 for b1, b2 in zip(bin1, bin2)))
+            # Count differing bits and normalize to [0,1]
+            total_bits = len(bin1)
+            hamming_distance = sum(b1 != b2 for b1, b2 in zip(bin1, bin2))
+            return float(hamming_distance) / total_bits
         elif algorithm in [HashingAlgorithm.PHOTODNA, HashingAlgorithm.NETCLEAN]:
             # Licensed algorithm distance calculations would go here
             return 100.0
@@ -167,6 +173,21 @@ def find_available_port(start_port: int = 8000, max_attempts: int = 10) -> int:
         except OSError:
             continue
     raise RuntimeError(f"Could not find an available port in range {start_port}-{start_port + max_attempts - 1}")
+
+@app.get("/")
+async def root():
+    """Welcome endpoint with API information."""
+    return {
+        "message": "Welcome to the Image Comparison API",
+        "endpoints": {
+            "/": "This welcome message",
+            "/docs": "Interactive API documentation",
+            "/redoc": "Alternative API documentation",
+            "/compare": "Compare two images using various hashing algorithms",
+            "/find_nearest": "Find nearest matches for an image in the database"
+        },
+        "supported_algorithms": [algo.value for algo in HashingAlgorithm]
+    }
 
 @app.post("/compare")
 async def compare_images(image1: UploadFile = File(...), image2: UploadFile = File(...)):
@@ -223,18 +244,27 @@ async def compare_images(image1: UploadFile = File(...), image2: UploadFile = Fi
 def get_similarity_interpretation(distance: float, algorithm: HashingAlgorithm) -> str:
     """Get human-readable interpretation of the distance."""
     if algorithm == HashingAlgorithm.PDQ:
+        certainty = max(0, min(100, (1 - distance/256) * 100))
         if distance <= 30:
-            return "Very similar images (likely variations of the same image)"
+            return f"These images are nearly identical ({certainty:.1f}% match)"
         elif distance <= 80:
-            return "Moderately similar images"
-        return "Different images"
-    elif algorithm in [HashingAlgorithm.PHOTODNA, HashingAlgorithm.NETCLEAN]:
+            return f"These images are visually similar ({certainty:.1f}% match)"
+        else:
+            return f"These images are different ({certainty:.1f}% match)"
+    elif algorithm in [HashingAlgorithm.MD5, HashingAlgorithm.SHA1]:
+        return "Images are exactly identical" if distance == 0 else "Images are different"
+    elif algorithm == HashingAlgorithm.PHOTODNA:
         available, message = check_algorithm_availability(algorithm)
         if not available:
-            return message
-        return "Algorithm not implemented - requires valid license"
+            return "PhotoDNA requires a license - Contact Microsoft for access"
+        return "PhotoDNA comparison not available (requires license)"
+    elif algorithm == HashingAlgorithm.NETCLEAN:
+        available, message = check_algorithm_availability(algorithm)
+        if not available:
+            return "NetClean requires a license - Contact NetClean for access"
+        return "NetClean comparison not available (requires license)"
     else:
-        return "Exact match" if distance == 0 else "Different images"
+        return "Unknown algorithm"
 
 @app.post("/find_nearest")
 async def find_nearest_matches(
