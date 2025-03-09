@@ -1,4 +1,12 @@
 import { QueueStats, QueueConfig } from '../types/queue';
+import { getMockQueueStats, getMockQueueConfig } from '../utils/mockData';
+
+/**
+ * Global flag for using mock data instead of real API calls
+ * This allows easy toggling between real and mock data for development
+ * without changing code in multiple places
+ */
+export const useMockData = true;
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -35,6 +43,9 @@ export const QueueAPI = {
    * Get queue configuration options
    */
   getQueueConfig: async (): Promise<QueueConfig> => {
+    if (useMockData) {
+      return getMockQueueConfig();
+    }
     return apiCall<QueueConfig>('/queues/config');
   },
 
@@ -46,6 +57,14 @@ export const QueueAPI = {
     hashAlgorithm?: string;
     isEscalated?: boolean;
   }): Promise<QueueStats[]> => {
+    if (useMockData) {
+      return getMockQueueStats(
+        params?.contentCategory,
+        params?.hashAlgorithm,
+        params?.isEscalated
+      );
+    }
+    
     // Build query string
     const queryParams = new URLSearchParams();
     if (params?.contentCategory) queryParams.append('content_category', params.contentCategory);
