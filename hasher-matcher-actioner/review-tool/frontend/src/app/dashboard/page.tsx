@@ -22,6 +22,17 @@ import {
   Button,
   useToast,
   Badge,
+  Drawer,
+  DrawerOverlay,
+  DrawerContent,
+  DrawerCloseButton,
+  DrawerHeader,
+  DrawerBody,
+  DrawerFooter,
+  FormControl,
+  FormLabel,
+  Switch,
+  VStack,
 } from '@chakra-ui/react';
 import AppLayout from '../components/layout/AppLayout';
 import { QueueCard } from '../components/dashboard/QueueCard';
@@ -43,6 +54,9 @@ const Dashboard = () => {
   const [selectedConfidenceLevel, setSelectedConfidenceLevel] = useState<string>('');
   const [showEscalated, setShowEscalated] = useState<boolean>(false);
   const [sortBy, setSortBy] = useState<string>('oldest');
+
+  // Filter drawer state
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   // Function to fetch dashboard data from the API
   const fetchDashboardData = useCallback(async () => {
@@ -190,6 +204,22 @@ const Dashboard = () => {
       default: return 'gray';
     }
   };
+  
+  // Function to get badge color based on content category
+  const getCategoryColor = (category: string): string => {
+    switch (category.toLowerCase()) {
+      case 'hate_speech': return 'red';
+      case 'violence': return 'orange';
+      case 'terrorism': return 'red';
+      case 'adult': return 'pink';
+      case 'sexual_content': return 'pink';
+      case 'harassment': return 'purple';
+      case 'self_harm': return 'red';
+      case 'spam': return 'blue';
+      case 'misinformation': return 'teal';
+      default: return 'gray';
+    }
+  };
 
   // UI states
   const bgColor = useColorModeValue('gray.50', 'gray.900');
@@ -243,27 +273,59 @@ const Dashboard = () => {
           formatDuration={formatDuration}
         />
         
-        {/* Filters */}
-        <Flex justify="flex-end" mb={5}>
-          <Button 
-            leftIcon={<span>🔄</span>}
-            colorScheme="blue" 
-            variant="outline"
-            size="md"
-            mr={3}
-            onClick={handleRefresh} 
-            isLoading={loading}
-          >
-            Refresh
-          </Button>
-          <Button
-            leftIcon={<span>🔍</span>}
-            colorScheme="gray"
-            variant="outline"
-            size="md"
-          >
-            Filter
-          </Button>
+        {/* Active Filters Display */}
+        <Flex justify="space-between" align="center" mb={5}>
+          <HStack spacing={2} wrap="wrap">
+            {selectedCategory && (
+              <Badge colorScheme={getCategoryColor(selectedCategory)} px={2} py={1} borderRadius="md">
+                Category: {selectedCategory}
+                <Button size="xs" ml={1} onClick={() => setSelectedCategory('')}>×</Button>
+              </Badge>
+            )}
+            {selectedHashAlgorithm && (
+              <Badge colorScheme={getAlgorithmColor(selectedHashAlgorithm)} px={2} py={1} borderRadius="md">
+                Algorithm: {selectedHashAlgorithm.toUpperCase()}
+                <Button size="xs" ml={1} onClick={() => setSelectedHashAlgorithm('')}>×</Button>
+              </Badge>
+            )}
+            {showEscalated && (
+              <Badge colorScheme="red" px={2} py={1} borderRadius="md">
+                Escalated Only
+                <Button size="xs" ml={1} onClick={() => setShowEscalated(false)}>×</Button>
+              </Badge>
+            )}
+            {(selectedCategory || selectedHashAlgorithm || showEscalated) && (
+              <Button size="xs" variant="link" onClick={() => {
+                setSelectedCategory('');
+                setSelectedHashAlgorithm('');
+                setShowEscalated(false);
+              }}>
+                Clear All
+              </Button>
+            )}
+          </HStack>
+          <Flex>
+            <Button 
+              leftIcon={<span>🔄</span>}
+              colorScheme="blue" 
+              variant="outline"
+              size="md"
+              mr={3}
+              onClick={handleRefresh} 
+              isLoading={loading}
+            >
+              Refresh
+            </Button>
+            <Button
+              leftIcon={<span>🔍</span>}
+              colorScheme="gray"
+              variant="outline"
+              size="md"
+              onClick={() => setIsFilterOpen(true)}
+            >
+              Filter
+            </Button>
+          </Flex>
         </Flex>
         
         {/* Queue Table */}
@@ -311,7 +373,7 @@ const Dashboard = () => {
                         alignItems="center"
                       >
                         <Badge colorScheme={getAlgorithmColor(queue.hashAlgorithm)} fontSize="0.9em" px={2} py={1}>
-                          {queue.contentCategory.charAt(0).toUpperCase() + queue.contentCategory.slice(1)} - {queue.hashAlgorithm.toUpperCase()}
+                          {queue.contentCategory.charAt(0).toUpperCase() + queue.contentCategory.slice(1)}
                         </Badge>
                         {queue.isEscalated && (
                           <Badge ml={2} colorScheme="red" fontSize="0.9em" px={2} py={1}>
@@ -379,6 +441,104 @@ const Dashboard = () => {
             </Box>
           </Box>
         </Box>
+        
+        {/* Filter Drawer */}
+        <Drawer
+          isOpen={isFilterOpen}
+          placement="right"
+          onClose={() => setIsFilterOpen(false)}
+          size="md"
+        >
+          <DrawerOverlay />
+          <DrawerContent>
+            <DrawerCloseButton />
+            <DrawerHeader borderBottomWidth="1px">
+              Filter Queues
+            </DrawerHeader>
+
+            <DrawerBody>
+              <VStack spacing={6} align="stretch" py={4}>
+                {/* Category Filter */}
+                <Box>
+                  <Text fontWeight="bold" mb={2}>Content Category</Text>
+                  <Select
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    placeholder="All Categories"
+                  >
+                    {config?.contentCategories.map(category => (
+                      <option key={category} value={category}>
+                        {category.charAt(0).toUpperCase() + category.slice(1)}
+                      </option>
+                    ))}
+                  </Select>
+                </Box>
+                
+                {/* Hash Algorithm Filter */}
+                <Box>
+                  <Text fontWeight="bold" mb={2}>Hash Algorithm</Text>
+                  <Select
+                    value={selectedHashAlgorithm}
+                    onChange={(e) => setSelectedHashAlgorithm(e.target.value)}
+                    placeholder="All Algorithms"
+                  >
+                    {config?.hashAlgorithms.map(algorithm => (
+                      <option key={algorithm} value={algorithm}>
+                        {algorithm.toUpperCase()}
+                      </option>
+                    ))}
+                  </Select>
+                </Box>
+                
+                {/* Escalated Filter */}
+                <Box>
+                  <FormControl display="flex" alignItems="center">
+                    <FormLabel htmlFor="escalated-switch" mb="0">
+                      Show Escalated Content Only
+                    </FormLabel>
+                    <Switch
+                      id="escalated-switch"
+                      isChecked={showEscalated}
+                      onChange={(e) => setShowEscalated(e.target.checked)}
+                      colorScheme="red"
+                    />
+                  </FormControl>
+                </Box>
+                
+                {/* Sort Order */}
+                <Box>
+                  <Text fontWeight="bold" mb={2}>Sort By</Text>
+                  <Select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                  >
+                    <option value="oldest">Oldest Tasks First</option>
+                    <option value="pending">Most Pending Tasks</option>
+                    <option value="success">Highest Success Rate</option>
+                  </Select>
+                </Box>
+              </VStack>
+            </DrawerBody>
+
+            <DrawerFooter borderTopWidth="1px">
+              <Button 
+                variant="outline" 
+                mr={3} 
+                onClick={() => {
+                  setSelectedCategory('');
+                  setSelectedHashAlgorithm('');
+                  setShowEscalated(false);
+                  setSortBy('oldest');
+                }}
+              >
+                Reset
+              </Button>
+              <Button colorScheme="blue" onClick={() => setIsFilterOpen(false)}>
+                Apply Filters
+              </Button>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
       </Box>
     </AppLayout>
   );
