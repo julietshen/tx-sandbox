@@ -47,6 +47,9 @@ export default function ReviewPage() {
   const searchParams = useSearchParams();
   const toast = useToast();
   
+  // Use mock data only - set to true to disable real API calls
+  const useMockDataOnly = true;
+  
   // Task data
   const [currentTask, setCurrentTask] = useState<QueueTask | null>(null);
   const [currentImage, setCurrentImage] = useState<Image | null>(null);
@@ -95,8 +98,13 @@ export default function ReviewPage() {
       
       // Fetch queue configuration if not already loaded
       if (!config) {
-        const configData = await QueueAPI.getQueueConfig();
-        setConfig(configData);
+        try {
+          const configData = await QueueAPI.getQueueConfig();
+          setConfig(configData);
+        } catch (err) {
+          console.error('Failed to fetch queue configuration', err);
+          // Continue with null config, we'll handle it later
+        }
       }
       
       // Prepare filters for API call
@@ -113,39 +121,71 @@ export default function ReviewPage() {
       if (showEscalated) filters.isEscalated = true;
       
       // Fetch next task
-      const taskData = await QueueAPI.getNextTask(filters);
+      let taskData;
+      try {
+        taskData = await QueueAPI.getNextTask(filters);
+      } catch (err) {
+        console.error('Failed to fetch next task', err);
+        throw new Error('Failed to fetch the next review task');
+      }
       
-      if (taskData) {
+      if (taskData && taskData.image_id) {
         setCurrentTask(taskData);
         
         // Fetch image details
-        const imageData = await ImageAPI.getImage(taskData.image_id);
-        setCurrentImage(imageData);
+        try {
+          const imageData = await ImageAPI.getImage(taskData.image_id);
+          setCurrentImage(imageData);
+        } catch (err) {
+          console.error('Failed to fetch image details', err);
+          throw new Error('Failed to fetch image details for the current task');
+        }
         
         // Fetch image matches
-        const matchesData = await ImageAPI.getImageMatches(taskData.image_id);
-        setMatches(matchesData?.matches || []);
-        
-        // Fetch similar images
-        const similarImagesData = matchesData?.similar_images || [];
-        setSimilarImages(similarImagesData as Image[]);
+        try {
+          const matchesData = await ImageAPI.getImageMatches(taskData.image_id);
+          setMatches(matchesData?.matches || []);
+          
+          // Fetch similar images
+          const similarImagesData = matchesData?.similar_images || [];
+          setSimilarImages(similarImagesData as Image[]);
+        } catch (err) {
+          console.error('Failed to fetch image matches', err);
+          // Continue without matches if they fail to load
+          setMatches([]);
+          setSimilarImages([]);
+        }
         
         // Get remaining count in queue
-        const statsData = await QueueAPI.getQueueStats({
-          contentCategory: selectedCategory,
-          hashAlgorithm: selectedHashAlgorithm,
-          isEscalated: showEscalated
-        });
-        
-        if (statsData && statsData.length > 0) {
-          setRemainingCount(statsData[0].pending || 0);
+        try {
+          const statsData = await QueueAPI.getQueueStats({
+            contentCategory: selectedCategory,
+            hashAlgorithm: selectedHashAlgorithm,
+            isEscalated: showEscalated
+          });
+          
+          if (statsData && statsData.length > 0) {
+            setRemainingCount(statsData[0].pending || 0);
+          }
+        } catch (err) {
+          console.error('Failed to fetch queue stats', err);
+          // Continue without updating remaining count
         }
       } else {
+        // No tasks returned or invalid task data
         setSimilarImages([]);
+        setCurrentTask(null);
+        setCurrentImage(null);
+        setMatches([]);
+        throw new Error('No more tasks available in the queue');
       }
     } catch (err) {
-      console.error('Failed to fetch next task', err);
-      setError('Failed to fetch the next review task. Please try again.');
+      console.error('Error in fetchNextTask', err);
+      if (err instanceof Error) {
+        setError(err.message || 'Failed to fetch the next review task. Please try again.');
+      } else {
+        setError('Failed to fetch the next review task. Please try again.');
+      }
       
       // For development, use mock data if API fails
       useMockData();
@@ -200,8 +240,22 @@ export default function ReviewPage() {
         isClosable: true,
       });
       
-      // Load next mock item
-      useMockData();
+      // In a real implementation, we would call the API to update the task status
+      try {
+        // If this is a real task with an ID (not mock data), call the API
+        if (currentTask.id && typeof currentTask.id === 'string' && !currentTask.id.startsWith('mock')) {
+          await QueueAPI.completeTask(currentTask.id, result, notes);
+          // After completing the task, fetch the next one
+          await fetchNextTask();
+        } else {
+          // For mock data, just load the next mock item
+          useMockData();
+        }
+      } catch (err) {
+        console.error('Error completing task:', err);
+        // If API call fails, fallback to mock data
+        useMockData();
+      }
             
       setSubmitting(false);
       
@@ -319,18 +373,38 @@ export default function ReviewPage() {
   // Handle review actions
   const handleApprove = (id: number, notes: string) => {
     completeReview('approved', notes);
+    // Next task is automatically loaded by useMockData in completeReview
   };
   
   const handleReject = (id: number, notes: string) => {
     completeReview('rejected', notes);
+    // Next task is automatically loaded by useMockData in completeReview
   };
   
   const handleEscalate = (id: number, notes: string) => {
     completeReview('escalated', notes);
+    // Next task is automatically loaded by useMockData in completeReview
   };
   
   const handleSkip = (id: number) => {
-    fetchNextTask();
+    try {
+      setSubmitting(true);
+      toast({
+        title: 'Task Skipped',
+        description: 'Moving to the next task in the queue',
+        status: 'info',
+        duration: 3000,
+        isClosable: true,
+      });
+      
+      // Load next task
+      fetchNextTask();
+    } catch (err) {
+      console.error('Failed to skip to next task', err);
+      setError('Failed to skip to the next task. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
   
   // Handle filter changes
@@ -374,7 +448,14 @@ export default function ReviewPage() {
       {/* Page Header */}
       <Flex justifyContent="space-between" alignItems="center" mb={4}>
         <Box>
-          <Heading size="lg">Review: {getQueueDisplayName()}</Heading>
+          <Flex alignItems="center" gap={2}>
+            <Heading size="lg">Review: {getQueueDisplayName()}</Heading>
+            {currentTask && (
+              <Badge colorScheme="teal" fontSize="md" p={1}>
+                Task ID: {currentTask.id}
+              </Badge>
+            )}
+          </Flex>
           <Text mt={1} color="gray.500">
             Here, you can review content that has been flagged based on hash matching.
             {remainingCount > 0 && ` ${remainingCount} items remaining.`}

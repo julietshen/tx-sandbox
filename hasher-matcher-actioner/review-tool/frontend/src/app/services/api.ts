@@ -1,6 +1,6 @@
 import { QueueStats, QueueConfig } from '../types/queue';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
 /**
  * Generic API call handler with error handling
@@ -140,6 +140,11 @@ export const ImageAPI = {
    * Get image details by ID
    */
   getImage: async (imageId: number) => {
+    // Check for undefined or invalid imageId
+    if (imageId === undefined || imageId === null) {
+      console.error('Invalid image ID provided to getImage:', imageId);
+      throw new Error('Invalid image ID provided');
+    }
     return apiCall(`/images/${imageId}`);
   },
   
@@ -170,6 +175,11 @@ export const ImageAPI = {
    * Get matches for an image
    */
   getImageMatches: async (imageId: number) => {
+    // Check for undefined or invalid imageId
+    if (imageId === undefined || imageId === null) {
+      console.error('Invalid image ID provided to getImageMatches:', imageId);
+      throw new Error('Invalid image ID provided');
+    }
     return apiCall(`/images/${imageId}/matches`);
   }
 };
