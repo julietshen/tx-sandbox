@@ -21,6 +21,7 @@ import {
   AlertIcon,
   Button,
   useToast,
+  Badge,
 } from '@chakra-ui/react';
 import AppLayout from '../components/layout/AppLayout';
 import { QueueCard } from '../components/dashboard/QueueCard';
@@ -169,12 +170,25 @@ const Dashboard = () => {
     ? Math.max(...filteredStats.map(queue => queue.oldestTaskAge))
     : 0;
 
-  // Format time duration
+  // Function to format duration in a human-readable format
   const formatDuration = (seconds: number): string => {
     if (seconds < 60) return `${seconds}s`;
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
     if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
     return `${Math.floor(seconds / 86400)}d ${Math.floor((seconds % 86400) / 3600)}h`;
+  };
+
+  // Function to get badge color based on hash algorithm
+  const getAlgorithmColor = (algorithm: string): string => {
+    switch (algorithm.toLowerCase()) {
+      case 'pdq': return 'blue';
+      case 'md5': return 'purple';
+      case 'sha1': return 'teal';
+      case 'sha256': return 'cyan';
+      case 'escalated': return 'red';
+      case 'manual': return 'orange';
+      default: return 'gray';
+    }
   };
 
   // UI states
@@ -194,17 +208,19 @@ const Dashboard = () => {
   return (
     <AppLayout>
       <Box p={4} bg={bgColor} minH="calc(100vh - 100px)">
-        <Flex justifyContent="space-between" alignItems="center" mb={2}>
+        <Flex justifyContent="space-between" alignItems="center" mb={6}>
           <Box>
-            <Heading size="xl">Moderation Dashboard</Heading>
-            <Text color="gray.600" mt={1} mb={4}>
+            <Heading size="xl" color={useColorModeValue("gray.800", "white")}>Moderation Dashboard</Heading>
+            <Text color={useColorModeValue("gray.600", "gray.300")} fontSize="md" mt={2} fontWeight="medium">
               Moderation queues allow you to manually review content and users one at a time
             </Text>
           </Box>
           <Button 
-            colorScheme="purple" 
+            colorScheme="blue" 
             size="md"
             borderRadius="md"
+            fontWeight="bold"
+            px={6}
           >
             Create Queue
           </Button>
@@ -228,15 +244,15 @@ const Dashboard = () => {
         />
         
         {/* Filters */}
-        <Flex justify="flex-end" mb={4}>
+        <Flex justify="flex-end" mb={5}>
           <Button 
             leftIcon={<span>🔄</span>}
             colorScheme="blue" 
             variant="outline"
-            size="sm"
+            size="md"
+            mr={3}
             onClick={handleRefresh} 
             isLoading={loading}
-            mr={2}
           >
             Refresh
           </Button>
@@ -244,7 +260,7 @@ const Dashboard = () => {
             leftIcon={<span>🔍</span>}
             colorScheme="gray"
             variant="outline"
-            size="sm"
+            size="md"
           >
             Filter
           </Button>
@@ -255,11 +271,12 @@ const Dashboard = () => {
           borderWidth="1px" 
           borderRadius="lg" 
           overflow="hidden" 
-          bg="white" 
-          boxShadow="sm"
+          bg={useColorModeValue("white", "gray.800")} 
+          boxShadow="md"
+          borderColor={useColorModeValue("gray.200", "gray.700")}
         >
           <Box as="table" width="100%" style={{ borderCollapse: 'collapse' }}>
-            <Box as="thead" bg="gray.50">
+            <Box as="thead" bg={useColorModeValue("gray.50", "gray.700")}>
               <Box as="tr">
                 <Box as="th" p={4} textAlign="left" fontWeight="semibold" width="5%"></Box>
                 <Box as="th" p={4} textAlign="left" fontWeight="semibold" width="25%">Name</Box>
@@ -276,25 +293,50 @@ const Dashboard = () => {
                   </Box>
                 </Box>
               ) : sortedStats.length > 0 ? (
-                sortedStats.map((queue) => (
-                  <Box as="tr" key={queue.queueName} borderTopWidth="1px" _hover={{ bg: "gray.50" }}>
+                sortedStats.map((queue, index) => (
+                  <Box 
+                    as="tr" 
+                    key={queue.queueName} 
+                    borderTopWidth="1px" 
+                    borderColor={useColorModeValue("gray.200", "gray.700")}
+                    bg={useColorModeValue(index % 2 === 0 ? "white" : "gray.50", index % 2 === 0 ? "gray.800" : "gray.750")}
+                    _hover={{ bg: useColorModeValue("blue.50", "blue.900") }}
+                  >
                     <Box as="td" p={4} textAlign="center">
                       <Text fontSize="xl" color="yellow.400">☆</Text>
                     </Box>
                     <Box as="td" p={4}>
-                      <Text fontWeight="semibold">
-                        {queue.contentCategory.charAt(0).toUpperCase() + queue.contentCategory.slice(1)} - {queue.hashAlgorithm.toUpperCase()}
-                        {queue.isEscalated && " (Escalated)"}
-                      </Text>
+                      <Box
+                        display="inline-flex"
+                        alignItems="center"
+                      >
+                        <Badge colorScheme={getAlgorithmColor(queue.hashAlgorithm)} fontSize="0.9em" px={2} py={1}>
+                          {queue.contentCategory.charAt(0).toUpperCase() + queue.contentCategory.slice(1)} - {queue.hashAlgorithm.toUpperCase()}
+                        </Badge>
+                        {queue.isEscalated && (
+                          <Badge ml={2} colorScheme="red" fontSize="0.9em" px={2} py={1}>
+                            ESCALATED
+                          </Badge>
+                        )}
+                      </Box>
                     </Box>
                     <Box as="td" p={4}>
-                      <Text>
+                      <Text 
+                        fontWeight="medium" 
+                        color={useColorModeValue("gray.700", "gray.300")}
+                      >
                         {queue.contentCategory.charAt(0).toUpperCase() + queue.contentCategory.slice(1)} content 
                         {queue.isEscalated ? ' escalated' : ' flagged'} for review via {queue.hashAlgorithm.toUpperCase()} matching
                       </Text>
                     </Box>
                     <Box as="td" p={4}>
-                      <Text fontWeight="semibold">{queue.pending}</Text>
+                      <Text 
+                        fontWeight="bold" 
+                        fontSize="lg" 
+                        color={useColorModeValue("blue.600", "blue.300")}
+                      >
+                        {queue.pending}
+                      </Text>
                     </Box>
                     <Box as="td" p={3} textAlign="center">
                       <Button 
@@ -320,10 +362,10 @@ const Dashboard = () => {
                       </Button>
                     </Box>
                     <Box as="td" p={3} textAlign="center">
-                      <Button size="sm" variant="outline">Delete All Jobs</Button>
+                      <Button size="sm" variant="outline" colorScheme="red">Delete All Jobs</Button>
                     </Box>
                     <Box as="td" p={3} textAlign="center">
-                      <Button size="sm" variant="outline">Preview jobs</Button>
+                      <Button size="sm" variant="outline" colorScheme="gray">Preview jobs</Button>
                     </Box>
                   </Box>
                 ))
