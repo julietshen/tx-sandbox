@@ -119,9 +119,9 @@ const Dashboard = () => {
     
     toast({
       title: 'Using Demo Data',
-      description: 'Connected to API failed. Using demo data instead.',
+      description: 'API data unavailable. Using local test images and mock data instead.',
       status: 'info',
-      duration: 5000,
+      duration: 4000,
       isClosable: true,
     });
   };
@@ -262,13 +262,30 @@ const Dashboard = () => {
                       queue={queue}
                       formatDuration={formatDuration}
                       onReviewNext={(queueName) => {
+                        // Parse the queue name to extract category, algorithm, etc.
+                        // Example format: review:pdq:hate_speech:high
+                        const parts = queueName.split(':');
+                        const algorithm = parts[1] || '';
+                        const category = parts[2] || '';
+                        const confidenceLevel = parts[3] || '';
+                        const isEscalated = parts.length > 4 && parts[4] === 'escalated';
+                        
+                        // Build query params
+                        const params = new URLSearchParams();
+                        if (category) params.append('category', category);
+                        if (algorithm) params.append('algorithm', algorithm);
+                        if (confidenceLevel) params.append('confidence', confidenceLevel);
+                        if (isEscalated) params.append('escalated', 'true');
+                        
+                        // Navigate to review page
+                        window.location.href = `/review?${params.toString()}`;
+                        
                         toast({
                           title: 'Review Next Task',
                           description: `Navigating to review page for queue: ${queueName}`,
                           status: 'info',
                           duration: 3000,
                         });
-                        // In the future, implement navigation to review page with queue filter
                       }}
                     />
                   ))}
@@ -293,13 +310,30 @@ const Dashboard = () => {
                           queue={queue}
                           formatDuration={formatDuration}
                           onReviewNext={(queueName) => {
+                            // Parse the queue name to extract category, algorithm, etc.
+                            // Example format: review:pdq:hate_speech:high
+                            const parts = queueName.split(':');
+                            const algorithm = parts[1] || '';
+                            const category = parts[2] || '';
+                            const confidenceLevel = parts[3] || '';
+                            const isEscalated = parts.length > 4 && parts[4] === 'escalated';
+                            
+                            // Build query params
+                            const params = new URLSearchParams();
+                            if (category) params.append('category', category);
+                            if (algorithm) params.append('algorithm', algorithm);
+                            if (confidenceLevel) params.append('confidence', confidenceLevel);
+                            if (isEscalated) params.append('escalated', 'true');
+                            
+                            // Navigate to review page
+                            window.location.href = `/review?${params.toString()}`;
+                            
                             toast({
                               title: 'Review Next Task',
                               description: `Navigating to review page for queue: ${queueName}`,
                               status: 'info',
                               duration: 3000,
                             });
-                            // In the future, implement navigation to review page with queue filter
                           }}
                         />
                       ))

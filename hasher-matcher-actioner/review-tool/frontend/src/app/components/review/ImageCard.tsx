@@ -61,7 +61,8 @@ const ImageCard: React.FC<ImageCardProps> = ({
 
   // Check if image URL is a placeholder
   const isPlaceholder = url.includes('placeholder.com') || url.includes('unsplash.com');
-  const imageUrl = isPlaceholder ? url : url.startsWith('http') ? url : `/api/images/${id}/data`;
+  // Always use the provided URL directly instead of trying to construct API URLs
+  const imageUrl = url;
 
   // Compact view (for similar images list)
   if (isCompact) {

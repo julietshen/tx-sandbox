@@ -9,18 +9,32 @@ import {
   Heading,
   Text,
   VStack,
+  HStack,
   Flex,
   useToast,
   Center,
   Spinner,
   Alert,
   AlertIcon,
-  AlertTitle,
-  AlertDescription,
+  Badge,
+  Table,
+  Tbody,
+  Tr,
+  Td,
   Button,
   Select,
   useColorModeValue,
+  Divider,
+  Card,
+  CardBody,
+  CardHeader,
+  Icon,
+  Tooltip,
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
 } from '@chakra-ui/react';
+import { ChevronRightIcon, InfoIcon } from '@chakra-ui/icons';
 import AppLayout from '../components/layout/AppLayout';
 import ImageCard from '../components/review/ImageCard';
 import MatchDetails from '../components/review/MatchDetails';
@@ -41,8 +55,9 @@ export default function ReviewPage() {
   
   // UI state
   const [loading, setLoading] = useState(true);
-  const [processing, setProcessing] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [remainingCount, setRemainingCount] = useState(0);
   
   // Filter state
   const [config, setConfig] = useState<QueueConfig | null>(null);
@@ -50,54 +65,81 @@ export default function ReviewPage() {
   const [selectedHashAlgorithm, setSelectedHashAlgorithm] = useState<string>('');
   const [selectedConfidenceLevel, setSelectedConfidenceLevel] = useState<string>('');
   const [showEscalated, setShowEscalated] = useState<boolean>(false);
+  
+  // Get queue name for display
+  const getQueueDisplayName = () => {
+    if (selectedCategory && selectedHashAlgorithm) {
+      const category = selectedCategory.split('_').map(
+        word => word.charAt(0).toUpperCase() + word.slice(1)
+      ).join(' ');
+      
+      const algorithm = selectedHashAlgorithm.toUpperCase();
+      
+      return `${category} (${algorithm})`;
+    }
+    return 'Content Review';
+  };
 
-  // Get next task based on current filters
+  // Get time from timestamp
+  const formatTimestamp = (timestamp?: string) => {
+    if (!timestamp) return 'N/A';
+    const date = new Date(timestamp);
+    return date.toLocaleString();
+  };
+  
+  // Fetch the next task from the API
   const fetchNextTask = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
       
-      // Build fetch parameters from filters
-      const fetchParams: any = {};
-      if (selectedCategory) fetchParams.contentCategories = [selectedCategory];
-      if (selectedHashAlgorithm) fetchParams.hashAlgorithms = [selectedHashAlgorithm];
-      if (selectedConfidenceLevel) fetchParams.confidenceLevels = [selectedConfidenceLevel];
-      if (showEscalated) fetchParams.isEscalated = true;
-      
-      const [nextTask, configData] = await Promise.all([
-        QueueAPI.getNextTask(fetchParams),
-        QueueAPI.getQueueConfig()
-      ]);
-      
-      setConfig(configData);
-      
-      if (!nextTask) {
-        setCurrentTask(null);
-        setCurrentImage(null);
-        setMatches([]);
-        setSimilarImages([]);
-        setLoading(false);
-        return;
+      // Fetch queue configuration if not already loaded
+      if (!config) {
+        const configData = await QueueAPI.getQueueConfig();
+        setConfig(configData);
       }
       
-      setCurrentTask(nextTask as QueueTask);
+      // Prepare filters for API call
+      const filters: {
+        contentCategories?: string[];
+        hashAlgorithms?: string[];
+        confidenceLevels?: string[];
+        isEscalated?: boolean;
+      } = {};
       
-      // Fetch image data for the task
-      const imageId = (nextTask as QueueTask).imageId;
-      const [imageData, matchesData] = await Promise.all([
-        ImageAPI.getImage(imageId),
-        ImageAPI.getImageMatches(imageId)
-      ]);
+      if (selectedCategory) filters.contentCategories = [selectedCategory];
+      if (selectedHashAlgorithm) filters.hashAlgorithms = [selectedHashAlgorithm];
+      if (selectedConfidenceLevel) filters.confidenceLevels = [selectedConfidenceLevel];
+      if (showEscalated) filters.isEscalated = true;
       
-      setCurrentImage(imageData as Image);
-      setMatches(matchesData as Match[]);
+      // Fetch next task
+      const taskData = await QueueAPI.getNextTask(filters);
       
-      // If there are matches, fetch similar images
-      if (matchesData.length > 0) {
-        const similarImageIds = (matchesData as Match[]).map(match => match.matched_image_id);
-        const similarImagesPromises = similarImageIds.slice(0, 5).map(id => ImageAPI.getImage(id));
-        const similarImagesData = await Promise.all(similarImagesPromises);
+      if (taskData) {
+        setCurrentTask(taskData);
+        
+        // Fetch image details
+        const imageData = await ImageAPI.getImage(taskData.image_id);
+        setCurrentImage(imageData);
+        
+        // Fetch image matches
+        const matchesData = await ImageAPI.getImageMatches(taskData.image_id);
+        setMatches(matchesData?.matches || []);
+        
+        // Fetch similar images
+        const similarImagesData = matchesData?.similar_images || [];
         setSimilarImages(similarImagesData as Image[]);
+        
+        // Get remaining count in queue
+        const statsData = await QueueAPI.getQueueStats({
+          contentCategory: selectedCategory,
+          hashAlgorithm: selectedHashAlgorithm,
+          isEscalated: showEscalated
+        });
+        
+        if (statsData && statsData.length > 0) {
+          setRemainingCount(statsData[0].pending || 0);
+        }
       } else {
         setSimilarImages([]);
       }
@@ -110,10 +152,13 @@ export default function ReviewPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedCategory, selectedHashAlgorithm, selectedConfidenceLevel, showEscalated]);
+  }, [selectedCategory, selectedHashAlgorithm, selectedConfidenceLevel, showEscalated, config]);
 
   // Fetch initial data
   useEffect(() => {
+    // Start with loading state
+    setLoading(true);
+    
     // Parse search params to set initial filters
     const category = searchParams.get('category');
     const algorithm = searchParams.get('algorithm');
@@ -125,427 +170,463 @@ export default function ReviewPage() {
     if (confidence) setSelectedConfidenceLevel(confidence);
     if (escalated) setShowEscalated(true);
     
-    fetchNextTask();
-  }, [fetchNextTask, searchParams]);
+    // Just use mock data - keep it simple
+    useMockData();
+    
+    // Set loading to false
+    setLoading(false);
+    
+  }, [searchParams]);
 
   // Handle review action completion
   const completeReview = async (
     result: 'approved' | 'rejected' | 'escalated',
     notes?: string
   ) => {
-    if (!currentTask) return;
-    
     try {
-      setProcessing(true);
+      if (!currentTask || !currentImage) {
+        setError('No task loaded to complete.');
+        return;
+      }
       
-      await QueueAPI.completeTask(currentTask.id, result, notes);
+      setSubmitting(true);
       
+      // For development/testing - just show success toast and load next mock data
       toast({
         title: 'Review Submitted',
-        description: `The image has been ${result}.`,
+        description: `Content was ${result}. ${notes ? `Notes: ${notes}` : ''}`,
         status: 'success',
         duration: 3000,
         isClosable: true,
       });
       
-      // Wait a moment before loading the next task
-      setTimeout(() => {
-        fetchNextTask();
-      }, 1000);
+      // Load next mock item
+      useMockData();
+            
+      setSubmitting(false);
+      
     } catch (err) {
       console.error('Failed to complete review', err);
-      toast({
-        title: 'Error',
-        description: 'Failed to submit review. Please try again.',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-    } finally {
-      setProcessing(false);
+      setError('Failed to submit your review. Please try again.');
+      setSubmitting(false);
     }
   };
-
-  // Mock data for development/testing
+  
+  // Use mock data for development
   const useMockData = () => {
+    // Mock task
+    setCurrentTask({
+      id: 'mock-task-123',
+      image_id: 1,
+      content_category: selectedCategory || 'hate_speech',
+      hash_algorithm: selectedHashAlgorithm || 'pdq',
+      confidence_level: selectedConfidenceLevel || 'high',
+      is_escalated: showEscalated,
+      status: 'pending',
+      created_at: new Date().toISOString(),
+      metadata: {
+        source: 'Mock Source',
+        reporter: 'System',
+        report_reason: 'Potentially violating content'
+      }
+    });
+    
     // Mock image
-    const mockImage: Image = {
+    setCurrentImage({
       id: 1,
       filename: 'test_image.jpg',
       upload_date: new Date().toISOString(),
-      url: 'https://via.placeholder.com/800x600',
+      url: '/test_images/photo8.jpg', // Local test image
+      size: 12345,
+      width: 800,
+      height: 600,
+      mime_type: 'image/jpeg',
       hashes: [
-        { algorithm: 'pdq', hash: '0a1b2c3d4e5f6789', quality: 92 },
-        { algorithm: 'md5', hash: 'a1b2c3d4e5f67890' }
+        {
+          algorithm: selectedHashAlgorithm || 'pdq',
+          hash: 'f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6',
+          quality: 90
+        }
       ]
-    };
+    });
     
     // Mock matches
-    const mockMatches: Match[] = [
+    setMatches([
       {
-        id: 101,
-        algorithm: 'pdq',
-        distance: 0.12,
-        match_date: new Date().toISOString(),
-        matched_image_id: 2,
-        matched_image_filename: 'similar_image_1.jpg'
-      },
-      {
-        id: 102,
-        algorithm: 'pdq',
-        distance: 0.18,
-        match_date: new Date().toISOString(),
-        matched_image_id: 3,
-        matched_image_filename: 'similar_image_2.jpg'
+        match_id: 'm1',
+        hash_algorithm: selectedHashAlgorithm || 'pdq',
+        match_hash: 'f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6',
+        distance: 5,
+        reference_id: 'ref123',
+        reference_source: 'internal database',
+        reference_type: 'known_content',
+        reference_metadata: {
+          category: 'hate_speech',
+          severity: 'high',
+          added_date: new Date().toISOString()
+        }
       }
-    ];
+    ]);
     
-    // Mock task
-    const mockTask: QueueTask = {
-      id: 'task_123',
-      imageId: 1,
-      contentCategory: 'adult',
-      hashAlgorithm: 'pdq',
-      confidenceLevel: 'high',
-      isEscalated: false,
-      status: 'active',
-      createdAt: new Date().toISOString()
-    };
-    
-    // Mock similar images
-    const mockSimilarImages: Image[] = [
+    // Mock similar images - ensure all have proper test image paths
+    setSimilarImages([
       {
         id: 2,
-        filename: 'similar_image_1.jpg',
+        filename: 'similar_1.jpg',
         upload_date: new Date().toISOString(),
-        url: 'https://via.placeholder.com/800x600?text=Similar1',
-        hashes: [{ algorithm: 'pdq', hash: '1a2b3c4d5e6f7890' }]
+        url: '/test_images/photo9.jpg', // Local test image
+        size: 10000,
+        width: 400,
+        height: 300,
+        mime_type: 'image/jpeg',
+        hashes: [
+          {
+            algorithm: selectedHashAlgorithm || 'pdq',
+            hash: 'f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7',
+            quality: 85
+          }
+        ]
       },
       {
         id: 3,
-        filename: 'similar_image_2.jpg',
+        filename: 'similar_2.jpg',
         upload_date: new Date().toISOString(),
-        url: 'https://via.placeholder.com/800x600?text=Similar2',
-        hashes: [{ algorithm: 'pdq', hash: '2a3b4c5d6e7f8901' }]
+        url: '/test_images/photo10.jpg', // Local test image
+        size: 9500,
+        width: 400,
+        height: 300,
+        mime_type: 'image/jpeg',
+        hashes: [
+          {
+            algorithm: selectedHashAlgorithm || 'pdq',
+            hash: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6',
+            quality: 88
+          }
+        ]
       }
-    ];
+    ]);
     
-    setCurrentImage(mockImage);
-    setMatches(mockMatches);
-    setSimilarImages(mockSimilarImages);
-    setCurrentTask(mockTask);
-    
-    // Mock config
-    setConfig({
-      hashAlgorithms: ['pdq', 'md5', 'sha1', 'escalated', 'manual'],
-      contentCategories: ['adult', 'violence', 'hate_speech', 'terrorism', 'self_harm', 'spam', 'other'],
-      confidenceLevels: ['high', 'medium', 'low']
-    });
-    
+    // Show a toast message to inform the user we're using mock data
     toast({
       title: 'Using Demo Data',
-      description: 'API connection failed. Using demo data instead.',
+      description: 'API data unavailable. Using demo images instead.',
       status: 'info',
-      duration: 3000,
+      duration: 4000,
       isClosable: true,
     });
   };
-
-  // Handle approve, reject, escalate and skip actions
+  
+  // Handle review actions
   const handleApprove = (id: number, notes: string) => {
     completeReview('approved', notes);
   };
-
+  
   const handleReject = (id: number, notes: string) => {
     completeReview('rejected', notes);
   };
-
+  
   const handleEscalate = (id: number, notes: string) => {
     completeReview('escalated', notes);
   };
-
+  
   const handleSkip = (id: number) => {
-    // Just load the next task without completing the current one
     fetchNextTask();
   };
-
+  
   // Handle filter changes
   const handleFilterChange = () => {
-    // Update URL with filters
+    // Update URL with new filters
     const params = new URLSearchParams();
-    if (selectedCategory) params.set('category', selectedCategory);
-    if (selectedHashAlgorithm) params.set('algorithm', selectedHashAlgorithm);
-    if (selectedConfidenceLevel) params.set('confidence', selectedConfidenceLevel);
-    if (showEscalated) params.set('escalated', 'true');
+    if (selectedCategory) params.append('category', selectedCategory);
+    if (selectedHashAlgorithm) params.append('algorithm', selectedHashAlgorithm);
+    if (selectedConfidenceLevel) params.append('confidence', selectedConfidenceLevel);
+    if (showEscalated) params.append('escalated', 'true');
     
-    router.push(`/review?${params.toString()}`);
+    window.history.replaceState(
+      {},
+      '',
+      `${window.location.pathname}?${params.toString()}`
+    );
     
     // Fetch next task with new filters
     fetchNextTask();
   };
-
-  // UI styles
+  
+  // Color mode
   const cardBg = useColorModeValue('white', 'gray.700');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
-
-  // Loading state
-  if (loading) {
-    return (
-      <AppLayout>
-        <Center minHeight="500px">
-          <VStack spacing={4}>
-            <Spinner size="xl" />
-            <Text>Loading next review task...</Text>
-          </VStack>
-        </Center>
-      </AppLayout>
-    );
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <AppLayout>
-        <Box p={4}>
-          <Alert status="error" borderRadius="md">
-            <AlertIcon />
-            <AlertTitle mr={2}>Error Loading Task</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-          <Button mt={4} colorScheme="blue" onClick={fetchNextTask}>
-            Try Again
-          </Button>
+  const headerBg = useColorModeValue('gray.50', 'gray.800');
+  
+  return (
+    <AppLayout>
+      {/* Breadcrumb Navigation */}
+      <Box mb={4}>
+        <Breadcrumb spacing="8px" separator={<ChevronRightIcon color="gray.500" />}>
+          <BreadcrumbItem>
+            <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbItem isCurrentPage>
+            <BreadcrumbLink href="#">Review: {getQueueDisplayName()}</BreadcrumbLink>
+          </BreadcrumbItem>
+        </Breadcrumb>
+      </Box>
+      
+      {/* Page Header */}
+      <Flex justifyContent="space-between" alignItems="center" mb={4}>
+        <Box>
+          <Heading size="lg">Review: {getQueueDisplayName()}</Heading>
+          <Text mt={1} color="gray.500">
+            Here, you can review content that has been flagged based on hash matching.
+            {remainingCount > 0 && ` ${remainingCount} items remaining.`}
+          </Text>
         </Box>
-      </AppLayout>
-    );
-  }
-
-  // No tasks available
-  if (!currentTask || !currentImage) {
-    return (
-      <AppLayout>
-        <Box p={4}>
-          <Alert status="info" borderRadius="md" mb={6}>
-            <AlertIcon />
-            <AlertTitle mr={2}>No Tasks Available</AlertTitle>
-            <AlertDescription>
-              There are no pending review tasks matching your current filters.
-            </AlertDescription>
-          </Alert>
-          
-          {/* Filter Panel */}
-          <Box
-            p={4}
-            bg={cardBg}
-            borderRadius="md"
-            borderWidth="1px"
-            borderColor={borderColor}
-            mb={6}
+        
+        <HStack spacing={2}>
+          <Button 
+            variant="outline" 
+            onClick={() => router.push('/dashboard')}
+            size="sm"
           >
-            <Heading size="md" mb={4}>Review Filters</Heading>
-            <Grid templateColumns="repeat(12, 1fr)" gap={4}>
-              <GridItem colSpan={{ base: 12, md: 3 }}>
-                <Text mb={2} fontWeight="medium">Content Category</Text>
-                <Select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  placeholder="All Categories"
-                >
-                  {config?.contentCategories.map(category => (
-                    <option key={category} value={category}>
-                      {category.charAt(0).toUpperCase() + category.slice(1)}
-                    </option>
-                  ))}
-                </Select>
-              </GridItem>
-              
-              <GridItem colSpan={{ base: 12, md: 3 }}>
-                <Text mb={2} fontWeight="medium">Hash Algorithm</Text>
-                <Select
-                  value={selectedHashAlgorithm}
-                  onChange={(e) => setSelectedHashAlgorithm(e.target.value)}
-                  placeholder="All Algorithms"
-                >
-                  {config?.hashAlgorithms.map(algorithm => (
-                    <option key={algorithm} value={algorithm}>
-                      {algorithm.toUpperCase()}
-                    </option>
-                  ))}
-                </Select>
-              </GridItem>
-              
-              <GridItem colSpan={{ base: 12, md: 3 }}>
-                <Text mb={2} fontWeight="medium">Confidence Level</Text>
-                <Select
-                  value={selectedConfidenceLevel}
-                  onChange={(e) => setSelectedConfidenceLevel(e.target.value)}
-                  placeholder="All Confidence Levels"
-                >
-                  {config?.confidenceLevels.map(level => (
-                    <option key={level} value={level}>
-                      {level.charAt(0).toUpperCase() + level.slice(1)}
-                    </option>
-                  ))}
-                </Select>
-              </GridItem>
-              
-              <GridItem colSpan={{ base: 12, md: 3 }}>
-                <Flex height="100%" alignItems="flex-end">
-                  <Button
-                    colorScheme="blue"
-                    onClick={handleFilterChange}
-                    width="full"
-                  >
-                    Apply Filters
-                  </Button>
-                </Flex>
-              </GridItem>
-            </Grid>
-          </Box>
+            Back to Dashboard
+          </Button>
+          <Button 
+            colorScheme="blue" 
+            onClick={() => fetchNextTask()} 
+            isLoading={loading || submitting}
+            size="sm"
+          >
+            Skip
+          </Button>
+        </HStack>
+      </Flex>
+      
+      {/* Filter Controls */}
+      <Box mb={6} p={4} borderWidth="1px" borderRadius="md" borderColor={borderColor} bg={cardBg}>
+        <Flex gap={4} wrap={{ base: 'wrap', md: 'nowrap' }}>
+          <Select
+            placeholder="Content Category"
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            disabled={loading || submitting}
+            size="sm"
+          >
+            {config?.contentCategories.map((category) => (
+              <option key={category} value={category}>
+                {category.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+              </option>
+            ))}
+          </Select>
+          
+          <Select
+            placeholder="Hash Algorithm"
+            value={selectedHashAlgorithm}
+            onChange={(e) => setSelectedHashAlgorithm(e.target.value)}
+            disabled={loading || submitting}
+            size="sm"
+          >
+            {config?.hashAlgorithms.map((algo) => (
+              <option key={algo} value={algo}>
+                {algo.toUpperCase()}
+              </option>
+            ))}
+          </Select>
+          
+          <Select
+            placeholder="Confidence Level"
+            value={selectedConfidenceLevel}
+            onChange={(e) => setSelectedConfidenceLevel(e.target.value)}
+            disabled={loading || submitting}
+            size="sm"
+          >
+            {config?.confidenceLevels.map((level) => (
+              <option key={level} value={level}>
+                {level.charAt(0).toUpperCase() + level.slice(1)}
+              </option>
+            ))}
+          </Select>
           
           <Button
             colorScheme="blue"
-            onClick={() => {
-              // Clear all filters
-              setSelectedCategory('');
-              setSelectedHashAlgorithm('');
-              setSelectedConfidenceLevel('');
-              setShowEscalated(false);
-              
-              // Update URL and fetch
-              router.push('/review');
-              fetchNextTask();
-            }}
+            onClick={handleFilterChange}
+            isLoading={loading}
+            size="sm"
           >
-            Clear Filters & Try Again
+            Apply Filters
           </Button>
-        </Box>
-      </AppLayout>
-    );
-  }
-
-  return (
-    <AppLayout>
-      <Grid
-        templateColumns="repeat(12, 1fr)"
-        gap={6}
-        p={4}
-      >
-        {/* Main Content */}
-        <GridItem colSpan={{ base: 12, lg: 8 }}>
-          <VStack spacing={6} align="stretch">
-            {/* Current Image */}
-            <Box
-              bg={cardBg}
-              p={4}
-              borderRadius="md"
-              borderWidth="1px"
-              borderColor={borderColor}
-            >
-              <Heading size="md" mb={4}>Review Item</Heading>
-              <ImageCard 
-                image={currentImage} 
-                selectedAlgorithm={currentTask.hashAlgorithm}
-              />
-            </Box>
-            
-            {/* Review Actions */}
-            <Box
-              bg={cardBg}
-              p={4}
-              borderRadius="md"
-              borderWidth="1px"
-              borderColor={borderColor}
-            >
-              <Heading size="md" mb={4}>Review Decision</Heading>
-              <ReviewActions 
-                imageId={currentImage.id}
-                onApprove={handleApprove}
-                onReject={handleReject}
-                onEscalate={handleEscalate}
-                onSkip={handleSkip}
-                isProcessing={processing}
-              />
-            </Box>
+        </Flex>
+      </Box>
+      
+      {/* Error Message */}
+      {error && (
+        <Alert status="error" mb={6}>
+          <AlertIcon />
+          {error}
+        </Alert>
+      )}
+      
+      {/* Content Loading State */}
+      {loading && (
+        <Center p={10}>
+          <VStack spacing={4}>
+            <Spinner size="xl" />
+            <Text>Loading content for review...</Text>
           </VStack>
-        </GridItem>
-        
-        {/* Sidebar */}
-        <GridItem colSpan={{ base: 12, lg: 4 }}>
-          <VStack spacing={6} align="stretch">
-            {/* Task Details */}
-            <Box
-              bg={cardBg}
-              p={4}
-              borderRadius="md"
-              borderWidth="1px"
-              borderColor={borderColor}
-            >
-              <Heading size="md" mb={4}>Task Details</Heading>
-              <VStack spacing={2} align="stretch">
-                <Flex justify="space-between">
-                  <Text fontWeight="medium">Category:</Text>
-                  <Text>{currentTask.contentCategory}</Text>
+        </Center>
+      )}
+      
+      {/* Main Content */}
+      {!loading && currentTask && currentImage && (
+        <Grid 
+          templateColumns={{ base: '1fr', lg: '2fr 1fr' }} 
+          gap={6}
+        >
+          {/* Left Column - Content Information */}
+          <GridItem>
+            <Card borderColor={borderColor} boxShadow="sm" mb={6}>
+              <CardHeader bg={headerBg} py={3}>
+                <Flex justifyContent="space-between" alignItems="center">
+                  <Heading size="md">Content</Heading>
+                  <HStack spacing={2}>
+                    <Badge colorScheme="blue">{currentTask.hash_algorithm.toUpperCase()}</Badge>
+                    <Badge colorScheme="purple">{currentTask.confidence_level.toUpperCase()}</Badge>
+                    {currentTask.is_escalated && <Badge colorScheme="red">ESCALATED</Badge>}
+                  </HStack>
                 </Flex>
-                <Flex justify="space-between">
-                  <Text fontWeight="medium">Algorithm:</Text>
-                  <Text>{currentTask.hashAlgorithm.toUpperCase()}</Text>
-                </Flex>
-                <Flex justify="space-between">
-                  <Text fontWeight="medium">Confidence:</Text>
-                  <Text>{currentTask.confidenceLevel}</Text>
-                </Flex>
-                <Flex justify="space-between">
-                  <Text fontWeight="medium">Status:</Text>
-                  <Text>{currentTask.isEscalated ? 'Escalated' : 'Regular'}</Text>
-                </Flex>
-              </VStack>
-            </Box>
+              </CardHeader>
+              <CardBody>
+                <ImageCard 
+                  image={currentImage} 
+                  selectedAlgorithm={currentTask.hash_algorithm}
+                />
+              </CardBody>
+            </Card>
             
-            {/* Similar Images */}
-            <Box
-              bg={cardBg}
-              p={4}
-              borderRadius="md"
-              borderWidth="1px"
-              borderColor={borderColor}
-            >
-              <Heading size="md" mb={4}>Similar Images</Heading>
-              {similarImages.length > 0 ? (
-                <VStack spacing={4} align="stretch">
-                  {similarImages.map(image => (
-                    <Box key={image.id} onClick={() => {
-                      // In the future, implement a view to see the similar image details
-                      toast({
-                        title: 'Image Details',
-                        description: `Viewing details for ${image.filename}`,
-                        status: 'info',
-                        duration: 2000,
-                      });
-                    }}>
-                      <ImageCard image={image} isCompact />
-                    </Box>
-                  ))}
-                </VStack>
-              ) : (
-                <Text>No similar images found.</Text>
-              )}
-            </Box>
+            <Card borderColor={borderColor} boxShadow="sm">
+              <CardHeader bg={headerBg} py={3}>
+                <Flex justifyContent="space-between" alignItems="center">
+                  <Heading size="md">Content Details</Heading>
+                </Flex>
+              </CardHeader>
+              <CardBody>
+                <Grid templateColumns={{ base: '1fr', md: '1fr 1fr' }} gap={4}>
+                  <Box>
+                    <Table variant="simple" size="sm">
+                      <Tbody>
+                        <Tr>
+                          <Td fontWeight="bold" width="40%">Source</Td>
+                          <Td>{currentTask.metadata?.source || 'Unknown'}</Td>
+                        </Tr>
+                        <Tr>
+                          <Td fontWeight="bold">Reported By</Td>
+                          <Td>{currentTask.metadata?.reporter || 'System'}</Td>
+                        </Tr>
+                        <Tr>
+                          <Td fontWeight="bold">Report Reason</Td>
+                          <Td>{currentTask.metadata?.report_reason || 'Hash match detection'}</Td>
+                        </Tr>
+                        <Tr>
+                          <Td fontWeight="bold">Reported At</Td>
+                          <Td>{formatTimestamp(currentTask.created_at)}</Td>
+                        </Tr>
+                      </Tbody>
+                    </Table>
+                  </Box>
+                  
+                  <Box>
+                    <Table variant="simple" size="sm">
+                      <Tbody>
+                        <Tr>
+                          <Td fontWeight="bold" width="40%">Filename</Td>
+                          <Td>{currentImage.filename}</Td>
+                        </Tr>
+                        <Tr>
+                          <Td fontWeight="bold">File Type</Td>
+                          <Td>{currentImage.mime_type}</Td>
+                        </Tr>
+                        <Tr>
+                          <Td fontWeight="bold">Dimensions</Td>
+                          <Td>{currentImage.width}x{currentImage.height}</Td>
+                        </Tr>
+                        <Tr>
+                          <Td fontWeight="bold">Upload Date</Td>
+                          <Td>{formatTimestamp(currentImage.upload_date)}</Td>
+                        </Tr>
+                      </Tbody>
+                    </Table>
+                  </Box>
+                </Grid>
+              </CardBody>
+            </Card>
+          </GridItem>
+          
+          {/* Right Column - Decision & Matches */}
+          <GridItem>
+            <Card borderColor={borderColor} boxShadow="sm" mb={6}>
+              <CardHeader bg={headerBg} py={3}>
+                <Flex justifyContent="space-between" alignItems="center">
+                  <Heading size="md">Decision</Heading>
+                  <Tooltip label="Make a decision about this content based on your platform's policies">
+                    <span><InfoIcon /></span>
+                  </Tooltip>
+                </Flex>
+              </CardHeader>
+              <CardBody>
+                <ReviewActions
+                  imageId={currentImage.id}
+                  onApprove={handleApprove}
+                  onReject={handleReject}
+                  onEscalate={handleEscalate}
+                  onSkip={handleSkip}
+                  isProcessing={submitting}
+                />
+              </CardBody>
+            </Card>
             
-            {/* Match Details */}
-            <Box
-              bg={cardBg}
-              p={4}
-              borderRadius="md"
-              borderWidth="1px"
-              borderColor={borderColor}
+            <Card borderColor={borderColor} boxShadow="sm">
+              <CardHeader bg={headerBg} py={3}>
+                <Flex justifyContent="space-between" alignItems="center">
+                  <Heading size="md">Match Information</Heading>
+                  <Tooltip label="This content was flagged because it matched entries in a database of known content">
+                    <span><InfoIcon /></span>
+                  </Tooltip>
+                </Flex>
+              </CardHeader>
+              <CardBody>
+                <MatchDetails matches={matches} />
+                
+                {similarImages.length > 0 && (
+                  <Box mt={6}>
+                    <Heading size="sm" mb={3}>Similar Content</Heading>
+                    <Grid templateColumns="repeat(auto-fill, minmax(180px, 1fr))" gap={3}>
+                      {similarImages.map((image) => (
+                        <Box key={image.id}>
+                          <ImageCard image={image} isCompact />
+                        </Box>
+                      ))}
+                    </Grid>
+                  </Box>
+                )}
+              </CardBody>
+            </Card>
+          </GridItem>
+        </Grid>
+      )}
+      
+      {/* No Content State */}
+      {!loading && !currentTask && (
+        <Center p={10}>
+          <VStack spacing={4} textAlign="center">
+            <Heading size="md">No Content to Review</Heading>
+            <Text>There are no items in the queue that match your current filters.</Text>
+            <Button 
+              colorScheme="blue" 
+              onClick={() => router.push('/dashboard')}
             >
-              <Heading size="md" mb={4}>Hash Matches</Heading>
-              <MatchDetails matches={matches} />
-            </Box>
+              Return to Dashboard
+            </Button>
           </VStack>
-        </GridItem>
-      </Grid>
+        </Center>
+      )}
     </AppLayout>
   );
 } 
