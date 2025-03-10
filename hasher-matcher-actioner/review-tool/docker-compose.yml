@@ -12,6 +12,38 @@ services:
     networks:
       - hma-network
 
+  # Frontend service
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      - backend
+    networks:
+      - hma-network
+
+  # Backend service (API from the demo)
+  backend:
+    build:
+      context: ../demo/api
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../demo/api:/app
+      - backend-data:/app/data
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - hma-network
+
   # You can uncomment the redis-commander section if you want a web UI to manage Redis
   # redis-commander:
   #   image: rediscommander/redis-commander:latest
@@ -28,6 +60,7 @@ services:
 
 volumes:
   redis-data:
+  backend-data:
 
 networks:
   hma-network:
