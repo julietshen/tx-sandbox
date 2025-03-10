@@ -35,6 +35,10 @@ import {
   VStack,
   Icon,
   ButtonGroup,
+  Divider,
+  Card,
+  CardHeader,
+  CardBody,
 } from '@chakra-ui/react';
 import { RepeatIcon } from '@chakra-ui/icons';
 import AppLayout from '../components/layout/AppLayout';
@@ -43,6 +47,13 @@ import { FilterBar } from '../components/dashboard/FilterBar';
 import { StatsOverview } from '../components/dashboard/StatsOverview';
 import { QueueAPI } from '../services/api';
 import { QueueStats, QueueConfig } from '../types/queue';
+import dynamic from 'next/dynamic';
+
+// Import BatchHashCheck as a client-only component with no SSR
+const BatchHashCheck = dynamic(
+  () => import('../components/dashboard/BatchHashCheck'),
+  { ssr: false }
+);
 
 const Dashboard = () => {
   const [stats, setStats] = useState<QueueStats[]>([]);
@@ -60,6 +71,17 @@ const Dashboard = () => {
 
   // Filter drawer state
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  // New state for the tabs
+  const [activeTab, setActiveTab] = useState(0);
+
+  // Flag to determine if we're on the client
+  const [isClient, setIsClient] = useState(false);
+  
+  // Set isClient to true once component mounts (client-side only)
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Function to fetch dashboard data from the API
   const fetchDashboardData = useCallback(async () => {
@@ -373,199 +395,231 @@ const Dashboard = () => {
           formatDuration={formatDuration}
         />
         
-        {/* Active Filters Display */}
-        <Flex justify="space-between" align="center" mb={5}>
-          <HStack spacing={2} wrap="wrap">
-            {selectedCategory && (
-              <Badge colorScheme={getCategoryColor(selectedCategory)} px={2} py={1} borderRadius="md">
-                Category: {selectedCategory}
-                <Button size="xs" ml={1} onClick={() => setSelectedCategory('')}>×</Button>
-              </Badge>
-            )}
-            {selectedHashAlgorithm && (
-              <Badge colorScheme={getAlgorithmColor(selectedHashAlgorithm)} px={2} py={1} borderRadius="md">
-                Algorithm: {selectedHashAlgorithm.toUpperCase()}
-                <Button size="xs" ml={1} onClick={() => setSelectedHashAlgorithm('')}>×</Button>
-              </Badge>
-            )}
-            {showEscalated && (
-              <Badge colorScheme="red" px={2} py={1} borderRadius="md">
-                Escalated Only
-                <Button size="xs" ml={1} onClick={() => setShowEscalated(false)}>×</Button>
-              </Badge>
-            )}
-            {(selectedCategory || selectedHashAlgorithm || showEscalated) && (
-              <Button size="xs" variant="link" onClick={() => {
-                setSelectedCategory('');
-                setSelectedHashAlgorithm('');
-                setShowEscalated(false);
-              }}>
-                Clear All
-              </Button>
-            )}
-          </HStack>
+        {/* Dashboard Tabs */}
+        <Tabs variant="enclosed" 
+              colorScheme="blue" 
+              mt={8} 
+              mb={5} 
+              index={activeTab} 
+              onChange={(index) => setActiveTab(index)} 
+              bg={useColorModeValue("white", "gray.800")}
+              borderRadius="lg"
+              boxShadow="md"
+              borderColor={useColorModeValue("gray.200", "gray.700")}>
+          <TabList>
+            <Tab _selected={{ bg: useColorModeValue("blue.50", "blue.900"), borderColor: "blue.500", borderBottomColor: "transparent" }}>Review Queues</Tab>
+            <Tab _selected={{ bg: useColorModeValue("blue.50", "blue.900"), borderColor: "blue.500", borderBottomColor: "transparent" }}>Batch Image Processing</Tab>
+          </TabList>
           
-          {/* Button Group - Fix spacing issues */}
-          <ButtonGroup spacing={3} ml={2}>
-            <Button
-              colorScheme="blue"
-              leftIcon={<RepeatIcon />}
-              onClick={handleRefresh}
-            >
-              Refresh
-            </Button>
-            <Button
-              colorScheme="green"
-              onClick={handleReset}
-            >
-              Reset Demo
-            </Button>
-            <Button
-              colorScheme="purple"
-              leftIcon={<span>🔍</span>}
-              onClick={() => setIsFilterOpen(true)}
-            >
-              Filter
-            </Button>
-          </ButtonGroup>
-        </Flex>
-        
-        {/* Queue Table */}
-        <Box 
-          borderWidth="1px" 
-          borderRadius="lg" 
-          overflow="hidden" 
-          bg={useColorModeValue("white", "gray.800")} 
-          boxShadow="md"
-          borderColor={useColorModeValue("gray.200", "gray.700")}
-        >
-          <Box as="table" width="100%" style={{ borderCollapse: 'collapse' }}>
-            <Box as="thead" bg={useColorModeValue("gray.50", "gray.700")}>
-              <Box as="tr">
-                <Box as="th" p={4} textAlign="left" fontWeight="semibold" width="5%"></Box>
-                <Box as="th" p={4} textAlign="left" fontWeight="semibold" width="20%">Content Category</Box>
-                <Box as="th" p={4} textAlign="left" fontWeight="semibold" width="25%">Issue Description</Box>
-                <Box as="th" p={4} textAlign="left" fontWeight="semibold" width="10%">Pending</Box>
-                <Box as="th" p={4} textAlign="left" fontWeight="semibold" width="15%">Oldest Task</Box>
-                <Box as="th" p={4} textAlign="center" width="25%">Actions</Box>
-              </Box>
-            </Box>
-            <Box as="tbody">
-              {loading ? (
-                <Box as="tr">
-                  <Box as="td" colSpan={6} p={8} textAlign="center">
-                    <Spinner size="lg" />
-                  </Box>
-                </Box>
-              ) : sortedStats.length > 0 ? (
-                sortedStats.map((queue, index) => (
-                  <Box 
-                    as="tr" 
-                    key={queue.queueName} 
-                    borderTopWidth="1px" 
-                    borderColor={useColorModeValue("gray.200", "gray.700")}
-                    bg={useColorModeValue(index % 2 === 0 ? "white" : "gray.50", index % 2 === 0 ? "gray.800" : "gray.750")}
+          <TabPanels>
+            <TabPanel p={0}>
+              {/* Active Filters Display */}
+              <Flex justify="space-between" align="center" mb={5} p={4}>
+                <HStack spacing={2} wrap="wrap">
+                  {selectedCategory && (
+                    <Badge colorScheme={getCategoryColor(selectedCategory)} px={2} py={1} borderRadius="md">
+                      Category: {selectedCategory}
+                      <Button size="xs" ml={1} onClick={() => setSelectedCategory('')}>×</Button>
+                    </Badge>
+                  )}
+                  {selectedHashAlgorithm && (
+                    <Badge colorScheme={getAlgorithmColor(selectedHashAlgorithm)} px={2} py={1} borderRadius="md">
+                      Algorithm: {selectedHashAlgorithm.toUpperCase()}
+                      <Button size="xs" ml={1} onClick={() => setSelectedHashAlgorithm('')}>×</Button>
+                    </Badge>
+                  )}
+                  {showEscalated && (
+                    <Badge colorScheme="red" px={2} py={1} borderRadius="md">
+                      Escalated Only
+                      <Button size="xs" ml={1} onClick={() => setShowEscalated(false)}>×</Button>
+                    </Badge>
+                  )}
+                  {(selectedCategory || selectedHashAlgorithm || showEscalated) && (
+                    <Button size="xs" variant="link" onClick={() => {
+                      setSelectedCategory('');
+                      setSelectedHashAlgorithm('');
+                      setShowEscalated(false);
+                    }}>
+                      Clear All
+                    </Button>
+                  )}
+                </HStack>
+                
+                {/* Button Group - Fix spacing issues */}
+                <ButtonGroup spacing={3} ml={2}>
+                  <Button
+                    colorScheme="blue"
+                    leftIcon={<RepeatIcon />}
+                    onClick={handleRefresh}
                   >
-                    <Box as="td" p={4} textAlign="center">
-                      <Text fontSize="xl" color="yellow.400">☆</Text>
-                    </Box>
-                    <Box as="td" p={4}>
-                      <Box
-                        display="inline-flex"
-                        alignItems="center"
-                      >
-                        <Badge colorScheme={getCategoryColor(queue.contentCategory)} fontSize="0.9em" px={2} py={1}>
-                          {queue.contentCategory.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                        </Badge>
-                        {queue.isEscalated && (
-                          <Badge ml={2} colorScheme="red" fontSize="0.9em" px={2} py={1}>
-                            ESCALATED
-                          </Badge>
-                        )}
-                      </Box>
-                    </Box>
-                    <Box as="td" p={4}>
-                      <Text 
-                        fontWeight="medium" 
-                        color={useColorModeValue("gray.700", "gray.300")}
-                      >
-                        {getCategoryDescription(queue.contentCategory)}
-                        {queue.isEscalated && (
-                          <Text as="span" fontWeight="bold" color="red.500"> (Escalated)</Text>
-                        )}
-                      </Text>
-                    </Box>
-                    <Box as="td" p={4}>
-                      <Text 
-                        fontWeight="bold" 
-                        fontSize="lg" 
-                        color={useColorModeValue("blue.600", "blue.300")}
-                      >
-                        {/* Display actual pending count from the queue */}
-                        {queue.pending}
-                      </Text>
-                    </Box>
-                    <Box as="td" p={4}>
-                      <Text 
-                        fontWeight="medium"
-                        color={useColorModeValue("gray.700", "gray.300")}
-                      >
-                        {/* Directly override any extreme values with manually set durations */}
-                        {(() => {
-                          // Just directly assign fixed, varied, realistic values based on row index
-                          const fixedDurations = [
-                            'None',
-                            '5m',
-                            '30m',
-                            '1h',
-                            '2h',
-                            '5h',
-                            '12h',
-                            '1d 0h',
-                            '1d 12h',
-                            '2d 0h',
-                            '2d 12h',
-                            '3d 0h'
-                          ];
-                          return fixedDurations[index % fixedDurations.length];
-                        })()}
-                      </Text>
-                    </Box>
-                    <Box as="td" p={3} textAlign="center">
-                      <Button 
-                        colorScheme="blue" 
-                        size="sm"
-                        onClick={() => {
-                          // Parse the queue name to extract category, algorithm, etc.
-                          const parts = queue.queueName.split(':');
-                          const algorithm = parts[1] || '';
-                          const category = parts[2] || '';
-                          
-                          // Build query params
-                          const params = new URLSearchParams();
-                          if (category) params.append('category', category);
-                          if (algorithm) params.append('algorithm', algorithm);
-                          if (queue.isEscalated) params.append('escalated', 'true');
-                          
-                          // Navigate to review page
-                          window.location.href = `/review?${params.toString()}`;
-                        }}
-                      >
-                        Start Reviewing
-                      </Button>
+                    Refresh
+                  </Button>
+                  <Button
+                    colorScheme="green"
+                    onClick={handleReset}
+                  >
+                    Reset Demo
+                  </Button>
+                  <Button
+                    colorScheme="purple"
+                    leftIcon={<span>🔍</span>}
+                    onClick={() => setIsFilterOpen(true)}
+                  >
+                    Filter
+                  </Button>
+                </ButtonGroup>
+              </Flex>
+              
+              {/* Queue Table */}
+              <Box 
+                borderWidth="1px" 
+                borderRadius="lg" 
+                overflow="hidden" 
+                bg={useColorModeValue("white", "gray.800")} 
+                boxShadow="md"
+                borderColor={useColorModeValue("gray.200", "gray.700")}
+              >
+                <Box as="table" width="100%" style={{ borderCollapse: 'collapse' }}>
+                  <Box as="thead" bg={useColorModeValue("gray.50", "gray.700")}>
+                    <Box as="tr">
+                      <Box as="th" p={4} textAlign="left" fontWeight="semibold" width="5%"></Box>
+                      <Box as="th" p={4} textAlign="left" fontWeight="semibold" width="20%">Content Category</Box>
+                      <Box as="th" p={4} textAlign="left" fontWeight="semibold" width="25%">Issue Description</Box>
+                      <Box as="th" p={4} textAlign="left" fontWeight="semibold" width="10%">Pending</Box>
+                      <Box as="th" p={4} textAlign="left" fontWeight="semibold" width="15%">Oldest Task</Box>
+                      <Box as="th" p={4} textAlign="center" width="25%">Actions</Box>
                     </Box>
                   </Box>
-                ))
-              ) : (
-                <Box as="tr">
-                  <Box as="td" colSpan={6} p={8} textAlign="center">
-                    <Text>No queues available with the current filters. Try changing your filters or refreshing.</Text>
+                  <Box as="tbody">
+                    {loading ? (
+                      <Box as="tr">
+                        <Box as="td" colSpan={6} p={8} textAlign="center">
+                          <Spinner size="lg" />
+                        </Box>
+                      </Box>
+                    ) : sortedStats.length > 0 ? (
+                      sortedStats.map((queue, index) => (
+                        <Box 
+                          as="tr" 
+                          key={queue.queueName} 
+                          borderTopWidth="1px" 
+                          borderColor={useColorModeValue("gray.200", "gray.700")}
+                          bg={useColorModeValue(index % 2 === 0 ? "white" : "gray.50", index % 2 === 0 ? "gray.800" : "gray.750")}
+                        >
+                          <Box as="td" p={4} textAlign="center">
+                            <Text fontSize="xl" color="yellow.400">☆</Text>
+                          </Box>
+                          <Box as="td" p={4}>
+                            <Box
+                              display="inline-flex"
+                              alignItems="center"
+                            >
+                              <Badge colorScheme={getCategoryColor(queue.contentCategory)} fontSize="0.9em" px={2} py={1}>
+                                {queue.contentCategory.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                              </Badge>
+                              {queue.isEscalated && (
+                                <Badge ml={2} colorScheme="red" fontSize="0.9em" px={2} py={1}>
+                                  ESCALATED
+                                </Badge>
+                              )}
+                            </Box>
+                          </Box>
+                          <Box as="td" p={4}>
+                            <Text 
+                              fontWeight="medium" 
+                              color={useColorModeValue("gray.700", "gray.300")}
+                            >
+                              {getCategoryDescription(queue.contentCategory)}
+                              {queue.isEscalated && (
+                                <Text as="span" fontWeight="bold" color="red.500"> (Escalated)</Text>
+                              )}
+                            </Text>
+                          </Box>
+                          <Box as="td" p={4}>
+                            <Text 
+                              fontWeight="bold" 
+                              fontSize="lg" 
+                              color={useColorModeValue("blue.600", "blue.300")}
+                            >
+                              {/* Display actual pending count from the queue */}
+                              {queue.pending}
+                            </Text>
+                          </Box>
+                          <Box as="td" p={4}>
+                            <Text 
+                              fontWeight="medium"
+                              color={useColorModeValue("gray.700", "gray.300")}
+                            >
+                              {/* Directly override any extreme values with manually set durations */}
+                              {(() => {
+                                // Just directly assign fixed, varied, realistic values based on row index
+                                const fixedDurations = [
+                                  'None',
+                                  '5m',
+                                  '30m',
+                                  '1h',
+                                  '2h',
+                                  '5h',
+                                  '12h',
+                                  '1d 0h',
+                                  '1d 12h',
+                                  '2d 0h',
+                                  '2d 12h',
+                                  '3d 0h'
+                                ];
+                                return fixedDurations[index % fixedDurations.length];
+                              })()}
+                            </Text>
+                          </Box>
+                          <Box as="td" p={3} textAlign="center">
+                            <Button 
+                              colorScheme="blue" 
+                              size="sm"
+                              onClick={() => {
+                                // Parse the queue name to extract category, algorithm, etc.
+                                const parts = queue.queueName.split(':');
+                                const algorithm = parts[1] || '';
+                                const category = parts[2] || '';
+                                
+                                // Build query params
+                                const params = new URLSearchParams();
+                                if (category) params.append('category', category);
+                                if (algorithm) params.append('algorithm', algorithm);
+                                if (queue.isEscalated) params.append('escalated', 'true');
+                                
+                                // Navigate to review page
+                                window.location.href = `/review?${params.toString()}`;
+                              }}
+                            >
+                              Start Reviewing
+                            </Button>
+                          </Box>
+                        </Box>
+                      ))
+                    ) : (
+                      <Box as="tr">
+                        <Box as="td" colSpan={6} p={8} textAlign="center">
+                          <Text>No queues available with the current filters. Try changing your filters or refreshing.</Text>
+                        </Box>
+                      </Box>
+                    )}
                   </Box>
                 </Box>
+              </Box>
+            </TabPanel>
+            
+            <TabPanel>
+              {isClient && (
+                <BatchHashCheck 
+                  hashAlgorithms={config?.hashAlgorithms || []} 
+                  contentCategories={config?.contentCategories || []}
+                  getAlgorithmColor={getAlgorithmColor}
+                  getCategoryColor={getCategoryColor}
+                />
               )}
-            </Box>
-          </Box>
-        </Box>
+            </TabPanel>
+          </TabPanels>
+        </Tabs>
         
         {/* Filter Drawer */}
         <Drawer

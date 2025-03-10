@@ -122,6 +122,65 @@ export const QueueAPI = {
       method: 'POST',
       body: JSON.stringify(taskData)
     });
+  },
+  
+  /**
+   * Submit images for batch processing using existing queue infrastructure
+   * This uses the existing HMA functionality
+   */
+  submitBatchImages: async (files: File[], algorithms: string[], category: string) => {
+    if (useMockData) {
+      // Only run in browser environment to avoid hydration mismatch
+      if (typeof window === 'undefined') {
+        return [];
+      }
+
+      // For demo purposes, simulate batch processing using existing mock data
+      // This doesn't create a new API, just uses the existing mock infrastructure
+      
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      return files.map((file, index) => {
+        const hasMatch = index % 3 === 0; // Every third file has a match for demo
+        
+        return {
+          filename: file.name,
+          size: file.size,
+          uploadedAt: new Date().toISOString(),
+          category,
+          queueAdded: true,
+          hashAlgorithms: algorithms,
+          taskId: `task_${Date.now()}_${index}`, // This would normally come from the server
+          matches: hasMatch,
+          matchDetails: hasMatch ? algorithms.map(algo => ({
+            algorithm: algo,
+            distance: 20 + (index * 5) % 30, // Demo value
+            matchId: `match_${algo}_${index}`
+          })) : []
+        };
+      });
+    }
+    
+    // In a real implementation, this would use the existing HMA API to:
+    // 1. Upload the images
+    // 2. Create tasks for them in the queue
+    // 3. Return results
+    
+    const formData = new FormData();
+    files.forEach((file, index) => {
+      formData.append(`file_${index}`, file);
+    });
+    formData.append('algorithms', JSON.stringify(algorithms));
+    formData.append('category', category);
+    
+    return apiCall('/queues/batch-process', {
+      method: 'POST',
+      body: formData,
+      headers: {
+        // Don't set Content-Type here, it will be set automatically for FormData
+      }
+    });
   }
 };
 
