@@ -1,59 +1,53 @@
-# Projects in this Repository
+# ThreatExchange Sandbox - Personal Fork
 
-This repository originally started as code to support Meta's ThreatExchange API, but over time has grown to include a number of projects to support signal exchange and content moderation in general. Below are a list of sub-projects.
+This is a personal fork of Meta's [ThreatExchange](https://github.com/facebook/ThreatExchange) repository focused on developing demonstration tools for the Hasher-Matcher-Actioner (HMA) system. The primary goal is to showcase HMA capabilities through practical implementations for identifying and removing illegal material.
 
-## PDQ Image Hashing and Similarity Matching
+## Current Focus: HMA Review Tool
 
-PDQ is a photo hashing algorithm that can turn photos into 256 bit signatures which can then be used to match other photos.
+The main project in this fork is a demonstration review tool for the HMA system designed to:
 
-## TMK+PDQF (TMK) Video Hashing and Similarity Matching
+- Demonstrate efficient identification of illegal material through hash matching
+- Provide an intuitive interface for reviewing matched content
+- Showcase PDQ hashing and similar algorithms for media matching at scale
+- Serve as a reference implementation for similar tools
 
-TMK+PDQF (or TMK for short) is a video hashing algorithm that can turn videos into 256KB signatures which can be used to match other videos.
+For more details about the HMA Review Tool, see [PROJECT_NOTES.md](hasher-matcher-actioner/review-tool/PROJECT_NOTES.md).
 
-## Video PDQ (vPDQ) Video Hashing and Similarity Matching
+## Note
 
-Video PDQ (or vPDQ for short) is a simple video hashing algorithm that determines two videos are matching based on the amount of shared similar frames. It can easily be applied for other image algorithms, and not just PDQ.
+This repository is a personal sandbox for exploration and demonstration. For technical questions, official documentation, or production implementations, please refer to the main [Facebook ThreatExchange repository](https://github.com/facebook/ThreatExchange).
 
-## Hasher-Matcher-Actioner (HMA) Trust & Safety Platform
+## Original Repository Projects
 
-HMA is a ready-to-deploy content moderation project for AWS, containing many submodules. It allows you to maintain lists of known content to scan for, which you can either curate yourself or connect to other hash exchange programs to share and receive lists.  More can be found [at the wiki](https://github.com/facebook/ThreatExchange/wiki).
+The original repository contains several projects related to media hash matching and threat intelligence:
 
-A second version of this project, called "[Open Media Match](https://github.com/facebook/ThreatExchange/tree/main/open-media-match)" is under construction, which uses a cloud-agnostic docker-based deployment.
+### PDQ Image Hashing
 
-## python-threatexchange
+PDQ converts photos into 256-bit signatures for photo matching.
 
-A python Library/CLI tool available on pypi under `threatexchange` which provides implementations for content scanning and signal exchange. It provides reference implementations in python for downloading hashes from Meta's ThreatExchange API, scanning images with PDQ, and others. It can also be easily extended to work with other hash exchanges and other techniques, not all of which are written by the maintainers of this repository.
+### TMK+PDQF (TMK) Video Hashing
 
+TMK creates 256KB signatures from videos for video matching.
 
-## Meta's ThreatExchange API Reference Examples
+### Video PDQ (vPDQ)
 
-The `api-reference-examples` folder contains example implementations in various languages for using the API. These implementations are at various stages of completeness and may not all implement every endpoint available on the ThreatExchange API. For full details on the ThreatExchange API and UI, data formats, and best practices are available in the [ThreatExchange docs](https://developers.facebook.com/docs/threat-exchange/).
+vPDQ is a video hashing algorithm that identifies matching videos based on shared similar frames, applicable to various image algorithms.
 
-# Meta's ThreatExchange API
-ThreatExchange is a set of RESTful APIs on the Facebook Platform for querying, publishing, and sharing security threat information. It's a lightweight way for exchanging details on malware, phishing pages, and other threats with either specific members of the community or the ThreatExchange community at large.
+### Hasher-Matcher-Actioner (HMA)
 
-For full details on ThreatExchange and best practices are available in the ThreatExchange docs.
+HMA is a hash matching system for AWS that maintains lists of known illegal content for scanning. Content lists can be self-curated or obtained through hash exchange programs. Additional information is available [in the wiki](https://github.com/facebook/ThreatExchange/wiki).
 
-## Get All Available Data
+A newer version, "[Open Media Match](https://github.com/facebook/ThreatExchange/tree/main/open-media-match)", is in development with cloud-agnostic Docker-based deployment.
 
-For tag-driven workloads, supporting either bulk download or incremental updates, our currently recommended best practice is a [Java reference design](https://github.com/facebook/ThreatExchange/blob/main/api-reference-examples/java/te-tag-query/README.md).
+### python-threatexchange
 
-You can also explore the dataset using the hosted [ThreatExchange UI](https://developers.facebook.com/docs/threat-exchange/ui)
-
-## Getting Access
-
-To request access to ThreatExchange, please submit an application via [https://developers.facebook.com/products/threat-exchange/](https://developers.facebook.com/products/threat-exchange/).
-
-# Other Information about this Repository
-## Contributing
-
-We welcome contributions! See [CONTRIBUTING](https://github.com/facebook/ThreatExchange/blob/main/CONTRIBUTING.md) for details on how to get started, and our [Code of Conduct](https://github.com/facebook/ThreatExchange/blob/main/CODE_OF_CONDUCT.md).
+A Python library/CLI tool (`threatexchange` on PyPI) for media scanning and signal exchange, including implementations for downloading hashes from Meta's ThreatExchange API and scanning images with PDQ.
 
 ## License
 
-All projects in this repository are under the BSD license - see [./LICENSE](https://github.com/facebook/ThreatExchange/blob/main/LICENSE). However, there are some exceptions for files that were included for demonstration purposes, and their alternative licenses are noted at the top of the files themselves.
+All projects use the BSD license - see [./LICENSE](https://github.com/facebook/ThreatExchange/blob/main/LICENSE). Exceptions for demonstration files have their licenses noted in the file headers.
 
-As of 12/9/2021, this is the complete list of exceptions:
+Exception as of 12/9/2021:
 * pdq/cpp/CImg.h
 
 
